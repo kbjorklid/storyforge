@@ -14,6 +14,8 @@ const createProjectSlice = (set, get) => ({
             description,
             createdAt: new Date().toISOString(),
             rootFolderId: uuidv4(), // Each project has a root folder
+            context: '',
+            systemPrompt: '',
         };
         // Also create the root folder in content slice
         get().addFolder(newProject.rootFolderId, null, 'Root', newProject.id);
@@ -107,53 +109,57 @@ const createContentSlice = (set, get) => ({
         return newStoryId;
     },
 
-    saveStory: (id, content, author = 'user') => set((state) => {
-        const story = state.stories[id];
-        if (!story) return state;
+    saveStory: (id, content, author = 'user') => {
+        let newVersionId;
+        set((state) => {
+            const story = state.stories[id];
+            if (!story) return state;
 
-        // Handle legacy stories without versions
-        let versions = story.versions || {};
-        let currentVersionId = story.currentVersionId;
+            // Handle legacy stories without versions
+            let versions = story.versions || {};
+            let currentVersionId = story.currentVersionId;
 
-        if (!currentVersionId && Object.keys(versions).length === 0) {
-            // Create a root version from the current state if none exists
-            const rootVersionId = uuidv4();
-            const rootVersion = {
-                id: rootVersionId,
-                parentId: null,
-                timestamp: story.createdAt || new Date().toISOString(),
-                title: story.title,
-                description: story.description,
-                acceptanceCriteria: story.acceptanceCriteria,
-                author: 'user' // Assume user for legacy
-            };
-            versions = { [rootVersionId]: rootVersion };
-            currentVersionId = rootVersionId;
-        }
-
-        const newVersionId = uuidv4();
-        const newVersion = {
-            id: newVersionId,
-            parentId: currentVersionId,
-            timestamp: new Date().toISOString(),
-            title: content.title,
-            description: content.description,
-            acceptanceCriteria: content.acceptanceCriteria,
-            author
-        };
-
-        return {
-            stories: {
-                ...state.stories,
-                [id]: {
-                    ...story,
-                    ...content,
-                    versions: { ...versions, [newVersionId]: newVersion },
-                    currentVersionId: newVersionId
-                }
+            if (!currentVersionId && Object.keys(versions).length === 0) {
+                // Create a root version from the current state if none exists
+                const rootVersionId = uuidv4();
+                const rootVersion = {
+                    id: rootVersionId,
+                    parentId: null,
+                    timestamp: story.createdAt || new Date().toISOString(),
+                    title: story.title,
+                    description: story.description,
+                    acceptanceCriteria: story.acceptanceCriteria,
+                    author: 'user' // Assume user for legacy
+                };
+                versions = { [rootVersionId]: rootVersion };
+                currentVersionId = rootVersionId;
             }
-        };
-    }),
+
+            newVersionId = uuidv4();
+            const newVersion = {
+                id: newVersionId,
+                parentId: currentVersionId,
+                timestamp: new Date().toISOString(),
+                title: content.title,
+                description: content.description,
+                acceptanceCriteria: content.acceptanceCriteria,
+                author
+            };
+
+            return {
+                stories: {
+                    ...state.stories,
+                    [id]: {
+                        ...story,
+                        ...content,
+                        versions: { ...versions, [newVersionId]: newVersion },
+                        currentVersionId: newVersionId
+                    }
+                }
+            };
+        });
+        return newVersionId;
+    },
 
     restoreVersion: (storyId, versionId) => set((state) => {
         const story = state.stories[storyId];
@@ -170,6 +176,27 @@ const createContentSlice = (set, get) => ({
                     description: version.description,
                     acceptanceCriteria: version.acceptanceCriteria,
                     currentVersionId: versionId
+                }
+            }
+        };
+    }),
+
+    updateVersion: (storyId, versionId, updates) => set((state) => {
+        const story = state.stories[storyId];
+        if (!story || !story.versions || !story.versions[versionId]) return state;
+
+        return {
+            stories: {
+                ...state.stories,
+                [storyId]: {
+                    ...story,
+                    versions: {
+                        ...story.versions,
+                        [versionId]: {
+                            ...story.versions[versionId],
+                            ...updates
+                        }
+                    }
                 }
             }
         };

@@ -106,6 +106,19 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect 
             .join("g")
             .attr("transform", d => `translate(${d.y},${d.x})`);
 
+        // Add tooltip
+        node.append("title")
+            .text(d => {
+                let tooltip = `Created: ${new Date(d.data.timestamp).toLocaleString()}`;
+                if (d.data.changeTitle) {
+                    tooltip += `\nChange: ${d.data.changeTitle}`;
+                }
+                if (d.data.changeDescription) {
+                    tooltip += `\n${d.data.changeDescription}`;
+                }
+                return tooltip;
+            });
+
         // Circles
         node.append("circle")
             .attr("fill", d => {
@@ -131,7 +144,14 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect 
             .attr("x", d => d.children ? -10 : 10)
             .attr("text-anchor", d => d.children ? "end" : "start")
             .attr("fill", "var(--color-text-primary)") // Correct variable
-            .text(d => new Date(d.data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+            .text(d => {
+                if (d.data.changeTitle) {
+                    return d.data.changeTitle.length > 25
+                        ? d.data.changeTitle.substring(0, 25) + '...'
+                        : d.data.changeTitle;
+                }
+                return new Date(d.data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            })
             .clone(true).lower()
             .attr("stroke", "var(--color-bg-secondary)")
             .attr("stroke-width", 3);

@@ -2,13 +2,31 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { Sparkles, Save, ArrowLeft, GitBranch } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { improveStory } from '../services/ai';
+import { improveStory, generateVersionChangeDescription } from '../services/ai';
 import ContentContainer from './ContentContainer';
 import VersionGraph from './VersionGraph';
 
 const StoryView = ({ storyId, onBack }) => {
-    const { stories, saveStory, restoreVersion, settings } = useStore();
+    const { stories, saveStory, restoreVersion, settings, updateVersion, projects } = useStore();
     const story = stories[storyId];
+    const project = projects.find(p => p.id === story?.parentId) || projects.find(p => p.rootFolderId === story?.parentId) || projects.find(p => {
+        // Fallback to find project by checking if story is in project's folder tree
+        // This is a bit complex without a direct link, but let's assume story.parentId is a folder ID.
+        // We need to find the project that owns this folder.
+        // Actually, let's look at how we can get the project.
+        // The store has folders, but they are in a separate slice.
+        // Let's just get the project from the URL or props if possible?
+        // Wait, StoryView is rendered inside Layout -> Sidebar/Content.
+        // But we don't have projectId passed here directly.
+        // However, we can find the project by iterating projects and checking if the story belongs to it.
+        // Or simpler: The story has a parentId which is a folder. The folder has a projectId.
+        return false;
+    });
+
+    // Better approach: Use the folders slice to find the project ID from the story's parent folder.
+    const { folders } = useStore();
+    const parentFolder = folders[story?.parentId];
+    const projectContext = parentFolder ? projects.find(p => p.id === parentFolder.projectId) : null;
 
     const [formData, setFormData] = useState({
         title: '',
@@ -42,7 +60,27 @@ const StoryView = ({ storyId, onBack }) => {
     };
 
     const handleSave = () => {
-        saveStory(storyId, formData);
+        const oldVersionId = story.currentVersionId;
+        const oldVersion = story.versions && oldVersionId ? story.versions[oldVersionId] : null;
+
+        const newVersionId = saveStory(storyId, formData);
+
+        if (oldVersion && newVersionId) {
+            const newVersionForAI = {
+                title: formData.title,
+                description: formData.description,
+                acceptanceCriteria: formData.acceptanceCriteria
+            };
+
+            generateVersionChangeDescription(oldVersion, newVersionForAI, settings).then(result => {
+                if (result) {
+                    updateVersion(storyId, newVersionId, {
+                        changeTitle: result.changeTitle,
+                        changeDescription: result.changeDescription
+                    });
+                }
+            });
+        }
     };
 
     const handleImprove = async () => {
@@ -54,7 +92,10 @@ const StoryView = ({ storyId, onBack }) => {
         setIsImproving(true);
         setError(null);
         try {
-            const improved = await improveStory(formData, settings);
+            const improved = await improveStory(formData, settings, {
+                context: projectContext?.context,
+                systemPrompt: projectContext?.systemPrompt
+            });
             setAiSuggestion(improved);
         } catch (err) {
             setError('Failed to improve story: ' + err.message);
@@ -64,10 +105,24 @@ const StoryView = ({ storyId, onBack }) => {
     };
 
     const applySuggestion = () => {
+        const oldVersionId = story.currentVersionId;
+        const oldVersion = story.versions && oldVersionId ? story.versions[oldVersionId] : null;
+
         setFormData(aiSuggestion);
         setAiSuggestion(null);
-        saveStory(storyId, aiSuggestion, 'ai');
+        const newVersionId = saveStory(storyId, aiSuggestion, 'ai');
         setActiveTab('edit');
+
+        if (oldVersion && newVersionId) {
+            generateVersionChangeDescription(oldVersion, aiSuggestion, settings).then(result => {
+                if (result) {
+                    updateVersion(storyId, newVersionId, {
+                        changeTitle: result.changeTitle,
+                        changeDescription: result.changeDescription
+                    });
+                }
+            });
+        }
     };
 
     const rejectSuggestion = () => {
