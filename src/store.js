@@ -38,7 +38,7 @@ const createProjectSlice = (set, get) => ({
     })),
 });
 
-const createContentSlice = (set, get) => ({
+const createContentSlice = (set) => ({
     folders: {}, // Record<string, Folder>
     stories: {}, // Record<string, Story>
 
@@ -64,6 +64,53 @@ const createContentSlice = (set, get) => ({
         }
 
         return newState;
+    }),
+
+    moveStory: (storyId, newParentId) => set((state) => {
+        const story = state.stories[storyId];
+        if (!story) return state;
+
+        const oldParentId = story.parentId;
+        if (oldParentId === newParentId) return state;
+
+        const newState = {
+            stories: {
+                ...state.stories,
+                [storyId]: { ...story, parentId: newParentId }
+            },
+            folders: { ...state.folders }
+        };
+
+        // Remove from old parent
+        if (oldParentId && newState.folders[oldParentId]) {
+            newState.folders[oldParentId] = {
+                ...newState.folders[oldParentId],
+                stories: newState.folders[oldParentId].stories.filter(id => id !== storyId)
+            };
+        }
+
+        // Add to new parent
+        if (newParentId && newState.folders[newParentId]) {
+            newState.folders[newParentId] = {
+                ...newState.folders[newParentId],
+                stories: [...newState.folders[newParentId].stories, storyId]
+            };
+        }
+
+        return newState;
+    }),
+
+    unsavedStories: {}, // Record<string, boolean>
+
+    setStoryUnsaved: (id, isUnsaved) => set((state) => {
+        if (!!state.unsavedStories[id] === isUnsaved) return state;
+        const newUnsaved = { ...state.unsavedStories };
+        if (isUnsaved) {
+            newUnsaved[id] = true;
+        } else {
+            delete newUnsaved[id];
+        }
+        return { unsavedStories: newUnsaved };
     }),
 
     addStory: (parentId, title, description, acceptanceCriteria) => {
@@ -155,7 +202,12 @@ const createContentSlice = (set, get) => ({
                         versions: { ...versions, [newVersionId]: newVersion },
                         currentVersionId: newVersionId
                     }
-                }
+                },
+                unsavedStories: (() => {
+                    const newUnsaved = { ...state.unsavedStories };
+                    delete newUnsaved[id];
+                    return newUnsaved;
+                })()
             };
         });
         return newVersionId;
@@ -210,6 +262,30 @@ const createContentSlice = (set, get) => ({
     })),
 
     deleteStory: (id) => set((state) => {
+        const story = state.stories[id];
+        if (!story) return state;
+
+        return {
+            stories: {
+                ...state.stories,
+                [id]: { ...story, deleted: true }
+            }
+        };
+    }),
+
+    restoreStory: (id) => set((state) => {
+        const story = state.stories[id];
+        if (!story) return state;
+
+        return {
+            stories: {
+                ...state.stories,
+                [id]: { ...story, deleted: false }
+            }
+        };
+    }),
+
+    permanentlyDeleteStory: (id) => set((state) => {
         const story = state.stories[id];
         if (!story) return state;
 

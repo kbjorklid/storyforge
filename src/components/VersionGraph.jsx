@@ -33,8 +33,7 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect 
         // Stratify
         const root = d3.stratify()
             .id(d => d.id)
-            .parentId(d => d.parentId)
-            (data);
+            .parentId(d => d.parentId)(data);
 
         // Tree layout
         // Use tree or cluster. Tree is usually better for history.
@@ -71,8 +70,8 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect 
             maxY = Math.max(maxY, d.x);
         });
 
-        const treeWidth = maxX - minX;
-        const treeHeight = maxY - minY;
+        // const treeWidth = maxX - minX;
+        // const treeHeight = maxY - minY;
 
         // Initial transform to center and have some padding
         const initialScale = 1;
@@ -146,8 +145,8 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect 
             .attr("fill", "var(--color-text-primary)") // Correct variable
             .text(d => {
                 if (d.data.changeTitle) {
-                    return d.data.changeTitle.length > 25
-                        ? d.data.changeTitle.substring(0, 25) + '...'
+                    return d.data.changeTitle.length > 15
+                        ? d.data.changeTitle.substring(0, 15) + '...'
                         : d.data.changeTitle;
                 }
                 return new Date(d.data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

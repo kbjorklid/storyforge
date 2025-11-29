@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import { Settings, LayoutDashboard } from 'lucide-react';
+import { Settings, LayoutDashboard, Trash2, RotateCcw } from 'lucide-react';
 
 const ProjectView = ({ projectId }) => {
-    const { projects, updateProject } = useStore();
+    const { projects, updateProject, stories, folders, restoreStory, permanentlyDeleteStory } = useStore();
     const project = projects.find(p => p.id === projectId);
     const [activeTab, setActiveTab] = useState('overview');
     const [formData, setFormData] = useState({
@@ -13,9 +13,15 @@ const ProjectView = ({ projectId }) => {
 
     useEffect(() => {
         if (project) {
-            setFormData({
-                context: project.context || '',
-                systemPrompt: project.systemPrompt || ''
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setFormData(prev => {
+                if (prev.context !== (project.context || '') || prev.systemPrompt !== (project.systemPrompt || '')) {
+                    return {
+                        context: project.context || '',
+                        systemPrompt: project.systemPrompt || ''
+                    };
+                }
+                return prev;
             });
         }
     }, [project]);
@@ -31,12 +37,15 @@ const ProjectView = ({ projectId }) => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    // Auto-save on blur or when switching tabs could be nice, 
-    // but for now let's just save on change or maybe add a save button?
-    // Actually, let's auto-save on blur for better UX or just use a save button if preferred.
-    // Given the requirement "Save settings to project data", let's do it on blur to be seamless.
     const handleBlur = () => {
         handleSaveSettings();
+    };
+
+    // Helper to check if a story belongs to the current project
+    const isStoryInProject = (story) => {
+        if (!story || !story.parentId) return false;
+        const parentFolder = folders[story.parentId];
+        return parentFolder && parentFolder.projectId === projectId;
     };
 
     return (
@@ -78,6 +87,20 @@ const ProjectView = ({ projectId }) => {
                     >
                         <Settings size={16} /> Project Settings
                     </button>
+                    <button
+                        onClick={() => setActiveTab('deleted')}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.5rem 1rem',
+                            backgroundColor: activeTab === 'deleted' ? 'var(--color-bg-tertiary)' : 'transparent',
+                            borderRadius: '4px',
+                            color: activeTab === 'deleted' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)'
+                        }}
+                    >
+                        <Trash2 size={16} /> Deleted Stories
+                    </button>
                 </div>
             </div>
 
@@ -86,7 +109,7 @@ const ProjectView = ({ projectId }) => {
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-secondary)' }}>
                         <p>Select a story from the sidebar to edit, or create a new one.</p>
                     </div>
-                ) : (
+                ) : activeTab === 'settings' ? (
                     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
                         <div style={{ marginBottom: '2rem' }}>
                             <h3 style={{ marginBottom: '1rem', color: 'var(--color-text-primary)' }}>Project Context</h3>
@@ -136,7 +159,75 @@ const ProjectView = ({ projectId }) => {
                             />
                         </div>
                     </div>
-                )}
+                ) : activeTab === 'deleted' ? (
+                    <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+                        <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-text-primary)' }}>Deleted Stories</h3>
+                        {Object.values(stories).filter(s => s.deleted && isStoryInProject(s)).length === 0 ? (
+                            <p style={{ color: 'var(--color-text-secondary)' }}>No deleted stories found.</p>
+                        ) : (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                {Object.values(stories)
+                                    .filter(s => s.deleted && isStoryInProject(s))
+                                    .map(story => (
+                                        <div key={story.id} style={{
+                                            padding: '1rem',
+                                            backgroundColor: 'var(--color-bg-secondary)',
+                                            borderRadius: '4px',
+                                            border: '1px solid var(--color-border)',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center'
+                                        }}>
+                                            <div>
+                                                <h4 style={{ margin: '0 0 0.5rem 0', color: 'var(--color-text-primary)' }}>{story.title}</h4>
+                                                <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--color-text-secondary)' }}>
+                                                    Deleted on {new Date().toLocaleDateString()}
+                                                </p>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <button
+                                                    onClick={() => restoreStory(story.id)}
+                                                    style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.5rem',
+                                                        padding: '0.5rem 1rem',
+                                                        backgroundColor: 'var(--color-bg-primary)',
+                                                        border: '1px solid var(--color-border)',
+                                                        borderRadius: '4px',
+                                                        color: 'var(--color-text-primary)',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    <RotateCcw size={14} /> Restore
+                                                </button>
+                                                <button
+                                                    onClick={() => {
+                                                        if (confirm('Are you sure you want to permanently delete this story? This action cannot be undone.')) {
+                                                            permanentlyDeleteStory(story.id);
+                                                        }
+                                                    }}
+                                                    style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.5rem',
+                                                        padding: '0.5rem 1rem',
+                                                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                                        border: '1px solid var(--color-danger)',
+                                                        borderRadius: '4px',
+                                                        color: 'var(--color-danger)',
+                                                        cursor: 'pointer'
+                                                    }}
+                                                >
+                                                    <Trash2 size={14} /> Delete Forever
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                            </div>
+                        )}
+                    </div>
+                ) : null}
             </div>
         </div>
     );

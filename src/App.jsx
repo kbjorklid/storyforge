@@ -7,8 +7,13 @@ import StoryView from './components/StoryView';
 import { useStore } from './store';
 
 function App() {
-  const { currentProjectId } = useStore();
+  const { currentProjectId, setCurrentProject } = useStore();
   const [selectedStoryId, setSelectedStoryId] = useState(null);
+
+  const handleProjectSelect = (projectId) => {
+    setCurrentProject(projectId);
+    setSelectedStoryId(null);
+  };
 
   const renderContent = () => {
     if (currentProjectId === 'settings') {
@@ -34,7 +39,11 @@ function App() {
   return (
     <Layout>
       <div style={{ display: 'flex', height: '100%', width: '100%' }}>
-        <Sidebar onSelectStory={setSelectedStoryId} />
+        <Sidebar
+          onSelectStory={setSelectedStoryId}
+          selectedStoryId={selectedStoryId}
+          onSelectProject={handleProjectSelect}
+        />
         <main style={{ flex: 1, overflowY: 'auto', padding: '2rem', backgroundColor: 'var(--color-bg-primary)' }}>
           {renderContent()}
         </main>
