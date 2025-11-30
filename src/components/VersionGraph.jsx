@@ -72,7 +72,7 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect,
             .id(d => d.id)
             .parentId(d => d.parentId)(data);
 
-        const treeLayout = d3.tree().nodeSize([80, 150]); // Increased spacing
+        const treeLayout = d3.tree().nodeSize([40, 75]); // Decreased spacing
         treeLayout(root);
 
         const svg = d3.select(svgRef.current)
@@ -121,7 +121,7 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect,
             targetNode = descendants[descendants.length - 1];
         }
 
-        const initialScale = 0.8;
+        const initialScale = 1.2;
         let initialX = margin.left;
         let initialY = height / 2;
 
@@ -202,10 +202,15 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect,
 
         // Labels
         node.append("text")
-            .attr("dy", "2.5em")
-            .attr("x", 0)
-            .attr("text-anchor", "middle")
-            .attr("fill", "var(--color-text-primary)")
+            .attr("transform", "rotate(45)")
+            .attr("x", 14)
+            .attr("dy", ".35em")
+            .attr("text-anchor", "start")
+            .attr("fill", d => {
+                if (d.data.id === currentVersionIdRef.current) return "var(--color-accent)";
+                if (d.data.id === selectedVersionIdRef.current) return "white";
+                return "var(--color-text-secondary)";
+            })
             .style("opacity", 0)
             .text(d => {
                 if (d.data.id === 'draft') return "Draft";

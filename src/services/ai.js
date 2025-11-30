@@ -460,3 +460,52 @@ export const splitStory = async (story, settings, projectSettings = {}, userInst
         throw error;
     }
 };
+
+export const generateSubfolderName = async (story, settings) => {
+    const { openRouterKey, smallModel } = settings;
+
+    if (!openRouterKey) {
+        return null;
+    }
+
+    const prompt = `
+    You are a helpful assistant.
+    Based on the following user story, suggest a short, concise name for a subfolder to contain stories split from this one.
+    The name should be 1-3 words max, e.g. "User Management", "Payment Flow", "Admin Dashboard".
+    
+    Story Title: ${story.title}
+    Story Description: ${story.description}
+
+    Return ONLY the name. Do not include quotes or any other text.
+    `;
+
+    try {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${openRouterKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'http://localhost:5173',
+                'X-Title': 'StoryForge',
+            },
+            body: JSON.stringify({
+                model: smallModel,
+                messages: [
+                    { role: 'user', content: prompt }
+                ]
+            })
+        });
+
+        if (!response.ok) {
+            return null;
+        }
+
+        const data = await response.json();
+        const content = data.choices[0].message.content;
+        return content.trim().replace(/['"]/g, '');
+
+    } catch (error) {
+        console.error('AI Service Error (Subfolder Name):', error);
+        return null;
+    }
+};

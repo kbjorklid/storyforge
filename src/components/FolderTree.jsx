@@ -307,7 +307,7 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
                                     }}
                                     transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                                 >
-                                    <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden', flex: 1, minWidth: 0 }}>
                                         <FileText size={12} style={{ marginRight: '0.5rem', minWidth: '12px', color: drafts[storyId] ? 'var(--color-warning)' : 'var(--color-success)' }} />
                                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{story.title}</span>
                                         {unsavedStories[storyId] && (
@@ -444,7 +444,7 @@ const FolderTree = ({ rootFolderId, onSelectStory, selectedStoryId, searchTerm }
                         }}
                         transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                     >
-                        <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden', flex: 1, minWidth: 0 }}>
                             <FileText size={12} style={{ marginRight: '0.5rem', minWidth: '12px', color: drafts[storyId] ? 'var(--color-warning)' : 'var(--color-success)' }} />
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{story.title}</span>
                             {unsavedStories[storyId] && (
