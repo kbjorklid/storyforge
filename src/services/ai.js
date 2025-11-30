@@ -1,18 +1,48 @@
-export const improveStory = async (story, settings, projectSettings = {}, qaContext = null) => {
-    const { openRouterKey, largeModel } = settings;
+export const improveStory = async (story, settings, projectSettings = {}, qaContext = null, rewriteSelection = null) => {
+    const { openRouterKey, largeModel, smallModel } = settings;
     const { context, systemPrompt } = projectSettings;
 
     if (!openRouterKey) {
         throw new Error('OpenRouter API Key is missing');
     }
 
+    // Determine which model to use based on selection
+    // If only title is selected, use small model. Otherwise use large/reasoning model.
+    let modelToUse = largeModel;
+    if (rewriteSelection) {
+        const { title, description, acceptanceCriteria } = rewriteSelection;
+        if (title && !description && !acceptanceCriteria) {
+            modelToUse = smallModel;
+        }
+    }
+
     let systemInstructions = `
     You are an expert Product Owner and Business Analyst.
     Please improve the following user story. 
+    `;
+
+    if (rewriteSelection) {
+        const { title, description, acceptanceCriteria } = rewriteSelection;
+        const parts = [];
+        if (title) parts.push("title");
+        if (description) parts.push("description");
+        if (acceptanceCriteria) parts.push("acceptanceCriteria");
+
+        systemInstructions += `
+    You have been asked to rewrite ONLY the following parts: ${parts.join(", ")}.
+    Do NOT modify any other parts of the story.
+    Return the result as a JSON object with keys: ${parts.map(p => `"${p}"`).join(", ")}.
+    `;
+    } else {
+        systemInstructions += `
     Make the title concise and action-oriented.
     Make the description clear, providing context and "who, what, why".
     Make the acceptance criteria specific, measurable, achievable, relevant, and time-bound (SMART).
     Return the result as a JSON object with keys: "title", "description", "acceptanceCriteria".
+    `;
+    }
+
+    systemInstructions += `
     The "description" and "acceptanceCriteria" fields MUST be strings (markdown is supported).
     Do NOT return arrays or objects for these fields.
     Do not include any markdown formatting around the JSON.
@@ -45,11 +75,11 @@ export const improveStory = async (story, settings, projectSettings = {}, qaCont
             headers: {
                 'Authorization': `Bearer ${openRouterKey}`,
                 'Content-Type': 'application/json',
-                'HTTP-Referer': 'http://localhost:5173', // Optional, for including your app on openrouter.ai rankings.
-                'X-Title': 'StoryForge', // Optional. Shows in rankings on openrouter.ai.
+                'HTTP-Referer': 'http://localhost:5173',
+                'X-Title': 'StoryForge',
             },
             body: JSON.stringify({
-                model: largeModel,
+                model: modelToUse,
                 messages: [
                     { role: 'system', content: systemInstructions },
                     { role: 'user', content: userPrompt }
@@ -80,10 +110,24 @@ export const improveStory = async (story, settings, projectSettings = {}, qaCont
             return String(content || '');
         };
 
-        parsed.description = ensureString(parsed.description);
-        parsed.acceptanceCriteria = ensureString(parsed.acceptanceCriteria);
+        if (parsed.description) parsed.description = ensureString(parsed.description);
+        if (parsed.acceptanceCriteria) parsed.acceptanceCriteria = ensureString(parsed.acceptanceCriteria);
 
-        return parsed;
+        // Merge with original story to ensure we don't lose unselected parts
+        // If rewriteSelection is provided, we only take the selected parts from the AI response
+        // and keep the rest from the original story.
+        let result = { ...story };
+
+        if (rewriteSelection) {
+            if (rewriteSelection.title && parsed.title) result.title = parsed.title;
+            if (rewriteSelection.description && parsed.description) result.description = parsed.description;
+            if (rewriteSelection.acceptanceCriteria && parsed.acceptanceCriteria) result.acceptanceCriteria = parsed.acceptanceCriteria;
+        } else {
+            // Fallback for when no selection is passed (legacy behavior), take everything
+            result = { ...result, ...parsed };
+        }
+
+        return result;
     } catch (error) {
         console.error('AI Service Error:', error);
         throw error;

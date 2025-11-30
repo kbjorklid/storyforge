@@ -1,14 +1,16 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import { Folder, FileText, ChevronRight, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { Folder, FileText, ChevronRight, ChevronDown, Plus, Trash2, MoreVertical, Edit2 } from 'lucide-react';
+import Menu from './Menu';
 
 const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searchTerm = '' }) => {
-    const { folders, stories, addFolder, addStory, deleteStory, moveStory, unsavedStories } = useStore();
+    const { folders, stories, addFolder, addStory, deleteStory, moveStory, moveFolder, unsavedStories, deleteFolder, updateFolder } = useStore();
     const folder = folders[folderId];
     const [isOpen, setIsOpen] = useState(true);
     const [isAdding, setIsAdding] = useState(null); // 'folder' or 'story'
     const [newItemName, setNewItemName] = useState('');
     const [isDragOver, setIsDragOver] = useState(false);
+    const [activeMenu, setActiveMenu] = useState(null); // { position: { x, y } }
 
     // Filter stories based on search term
     const filteredStories = folder ? folder.stories.filter(storyId => {
@@ -51,7 +53,7 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
         }
     }, [searchTerm, hasMatches]);
 
-    if (!folder || !isVisible) return null;
+    if (!folder || folder.deleted || !isVisible) return null;
 
     const handleAdd = (type) => {
         if (newItemName.trim()) {
@@ -69,7 +71,14 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
     };
 
     const handleDragStart = (e, storyId) => {
+        e.stopPropagation();
         e.dataTransfer.setData('storyId', storyId);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
+    const handleDragStartFolder = (e) => {
+        e.stopPropagation();
+        e.dataTransfer.setData('folderId', folderId);
         e.dataTransfer.effectAllowed = 'move';
     };
 
@@ -86,11 +95,51 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
 
     const handleDrop = (e) => {
         e.preventDefault();
+        e.stopPropagation();
         setIsDragOver(false);
         const storyId = e.dataTransfer.getData('storyId');
+        const droppedFolderId = e.dataTransfer.getData('folderId');
+
         if (storyId) {
             moveStory(storyId, folderId);
-            setIsOpen(true); // Open folder to show dropped item
+            setIsOpen(true);
+        } else if (droppedFolderId) {
+            moveFolder(droppedFolderId, folderId);
+            setIsOpen(true);
+        }
+    };
+
+    const handleMenuOpen = (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const rect = e.currentTarget.getBoundingClientRect();
+        setActiveMenu({
+            position: { x: rect.right + 5, y: rect.top }
+        });
+    };
+
+    const handleMenuAction = (action) => {
+        switch (action) {
+            case 'new-folder':
+                setIsAdding('folder');
+                setIsOpen(true);
+                break;
+            case 'new-story':
+                setIsAdding('story');
+                setIsOpen(true);
+                break;
+            case 'rename': {
+                const name = prompt('New Folder Name:', folder.name);
+                if (name && name.trim()) {
+                    updateFolder(folderId, { name: name.trim() });
+                }
+                break;
+            }
+            case 'delete':
+                if (confirm('Are you sure you want to delete this folder and all its contents?')) {
+                    deleteFolder(folderId);
+                }
+                break;
         }
     };
 
@@ -109,6 +158,8 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
                     border: isDragOver ? '1px dashed var(--color-accent)' : '1px solid transparent'
                 }}
                 className="folder-row"
+                draggable
+                onDragStart={handleDragStartFolder}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
@@ -125,30 +176,36 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
                 <Folder size={14} style={{ marginRight: '0.5rem', color: 'var(--color-accent)' }} />
                 <span style={{ fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folder.name}</span>
 
-                <div className="folder-actions" style={{ display: 'flex', gap: '0.25rem', opacity: 0.6 }}>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setIsAdding('folder');
-                            setIsOpen(true);
-                        }}
-                        title="Add Subfolder"
-                        style={{ padding: '0.1rem', background: 'transparent', border: 'none', color: 'var(--color-text-secondary)' }}
-                    >
-                        <Plus size={12} />F
-                    </button>
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            setIsAdding('story');
-                            setIsOpen(true);
-                        }}
-                        title="Add Story"
-                        style={{ padding: '0.1rem', background: 'transparent', border: 'none', color: 'var(--color-text-secondary)' }}
-                    >
-                        <Plus size={12} />S
-                    </button>
-                </div>
+                <button
+                    onClick={handleMenuOpen}
+                    style={{
+                        padding: '0.1rem',
+                        backgroundColor: 'transparent',
+                        color: 'var(--color-text-secondary)',
+                        border: 'none',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        opacity: 0.6
+                    }}
+                    className="folder-actions"
+                >
+                    <MoreVertical size={14} />
+                </button>
+
+                {activeMenu && (
+                    <Menu
+                        isOpen={true}
+                        onClose={() => setActiveMenu(null)}
+                        position={activeMenu.position}
+                        items={[
+                            { label: 'New Folder', icon: <Folder size={14} />, onClick: () => handleMenuAction('new-folder') },
+                            { label: 'New Story', icon: <FileText size={14} />, onClick: () => handleMenuAction('new-story') },
+                            { label: 'Rename Folder', icon: <Edit2 size={14} />, onClick: () => handleMenuAction('rename') },
+                            { label: 'Delete Folder', icon: <Trash2 size={14} />, onClick: () => handleMenuAction('delete'), danger: true },
+                        ]}
+                    />
+                )}
             </div>
 
             {isOpen && (
@@ -253,14 +310,91 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
 };
 
 const FolderTree = ({ rootFolderId, onSelectStory, selectedStoryId, searchTerm }) => {
+    const { folders, stories, deleteStory, unsavedStories } = useStore();
+    const rootFolder = folders[rootFolderId];
+
+    if (!rootFolder) return null;
+
+    // Filter stories based on search term (logic duplicated from FolderItem for root level)
+    const filteredStories = rootFolder.stories.filter(storyId => {
+        const story = stories[storyId];
+        if (!story || story.deleted) return false;
+        if (!searchTerm) return true;
+        return story.title.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+
+    const handleDragStart = (e, storyId) => {
+        e.stopPropagation();
+        e.dataTransfer.setData('storyId', storyId);
+        e.dataTransfer.effectAllowed = 'move';
+    };
+
     return (
         <div style={{ marginTop: '0.5rem' }}>
-            <FolderItem
-                folderId={rootFolderId}
-                onSelectStory={onSelectStory}
-                selectedStoryId={selectedStoryId}
-                searchTerm={searchTerm}
-            />
+            {rootFolder.children.map(childId => (
+                <FolderItem
+                    key={childId}
+                    folderId={childId}
+                    depth={0}
+                    onSelectStory={onSelectStory}
+                    selectedStoryId={selectedStoryId}
+                    searchTerm={searchTerm}
+                />
+            ))}
+
+            {filteredStories.map(storyId => {
+                const story = stories[storyId];
+                if (!story) return null;
+
+                return (
+                    <div
+                        key={storyId}
+                        onClick={() => onSelectStory(storyId)}
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, storyId)}
+                        style={{
+                            marginLeft: '12px', // Match depth 0 indentation
+                            padding: '0.25rem 0.5rem',
+                            display: 'flex',
+                            alignItems: 'center',
+                            cursor: 'grab',
+                            borderRadius: '4px',
+                            fontSize: '0.85rem',
+                            color: selectedStoryId === storyId ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',
+                            backgroundColor: selectedStoryId === storyId ? 'var(--color-bg-tertiary)' : 'transparent',
+                            fontWeight: selectedStoryId === storyId ? 500 : 400,
+                            justifyContent: 'space-between'
+                        }}
+                        className="story-row"
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
+                            <FileText size={12} style={{ marginRight: '0.5rem', minWidth: '12px' }} />
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{story.title}</span>
+                            {unsavedStories[storyId] && (
+                                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', marginLeft: '6px', flexShrink: 0 }}></div>
+                            )}
+                        </div>
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                deleteStory(storyId);
+                            }}
+                            className="delete-btn"
+                            style={{
+                                padding: '0.1rem',
+                                background: 'transparent',
+                                border: 'none',
+                                color: 'var(--color-text-secondary)',
+                                opacity: 0.6,
+                                cursor: 'pointer'
+                            }}
+                            title="Delete Story"
+                        >
+                            <Trash2 size={12} />
+                        </button>
+                    </div>
+                );
+            })}
         </div>
     );
 };

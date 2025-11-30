@@ -100,6 +100,100 @@ const createContentSlice = (set) => ({
         return newState;
     }),
 
+    moveFolder: (folderId, newParentId) => set((state) => {
+        const folder = state.folders[folderId];
+        const newParent = state.folders[newParentId];
+
+        if (!folder || !newParent) return state;
+        if (folder.parentId === newParentId) return state;
+        if (folderId === newParentId) return state;
+
+        // Cycle detection: Check if newParentId is a descendant of folderId
+        let current = newParent;
+        while (current.parentId) {
+            if (current.parentId === folderId) return state; // Cycle detected
+            current = state.folders[current.parentId];
+            if (!current) break; // Should not happen in valid tree
+        }
+
+        const newState = {
+            folders: { ...state.folders }
+        };
+
+        // Remove from old parent
+        if (folder.parentId && newState.folders[folder.parentId]) {
+            newState.folders[folder.parentId] = {
+                ...newState.folders[folder.parentId],
+                children: newState.folders[folder.parentId].children.filter(id => id !== folderId)
+            };
+        }
+
+        // Add to new parent
+        newState.folders[newParentId] = {
+            ...newState.folders[newParentId],
+            children: [...newState.folders[newParentId].children, folderId]
+        };
+
+        // Update folder's parentId
+        newState.folders[folderId] = {
+            ...newState.folders[folderId],
+            parentId: newParentId
+        };
+
+        return newState;
+    }),
+
+    deleteFolder: (folderId) => set((state) => {
+        const folder = state.folders[folderId];
+        if (!folder) return state;
+
+        // Recursive deletion helper
+        const getIdsToDelete = (fId, folders) => {
+            let fIds = [fId];
+            let sIds = [...(folders[fId]?.stories || [])];
+
+            const children = folders[fId]?.children || [];
+            children.forEach(childId => {
+                const { fIds: childFIds, sIds: childSIds } = getIdsToDelete(childId, folders);
+                fIds = [...fIds, ...childFIds];
+                sIds = [...sIds, ...childSIds];
+            });
+
+            return { fIds, sIds };
+        };
+
+        const { fIds: foldersToDelete, sIds: storiesToDelete } = getIdsToDelete(folderId, state.folders);
+
+        const newState = {
+            folders: { ...state.folders },
+            stories: { ...state.stories }
+        };
+
+        // Soft delete folders and their stories
+        foldersToDelete.forEach(id => {
+            if (newState.folders[id]) {
+                newState.folders[id] = { ...newState.folders[id], deleted: true };
+            }
+        });
+        storiesToDelete.forEach(id => {
+            if (newState.stories[id]) {
+                newState.stories[id] = { ...newState.stories[id], deleted: true };
+            }
+        });
+
+        return newState;
+    }),
+
+    updateFolder: (folderId, updates) => set((state) => {
+        if (!state.folders[folderId]) return state;
+        return {
+            folders: {
+                ...state.folders,
+                [folderId]: { ...state.folders[folderId], ...updates }
+            }
+        };
+    }),
+
     unsavedStories: {}, // Record<string, boolean>
 
     setStoryUnsaved: (id, isUnsaved) => set((state) => {
@@ -277,12 +371,25 @@ const createContentSlice = (set) => ({
         const story = state.stories[id];
         if (!story) return state;
 
-        return {
+        const newState = {
             stories: {
                 ...state.stories,
                 [id]: { ...story, deleted: false }
-            }
+            },
+            folders: { ...state.folders }
         };
+
+        // Recursively restore parent folders
+        let currentFolderId = story.parentId;
+        while (currentFolderId && newState.folders[currentFolderId]) {
+            const folder = newState.folders[currentFolderId];
+            if (folder.deleted) {
+                newState.folders[currentFolderId] = { ...folder, deleted: false };
+            }
+            currentFolderId = folder.parentId;
+        }
+
+        return newState;
     }),
 
     permanentlyDeleteStory: (id) => set((state) => {

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { Sparkles, Save, GitBranch, Scissors } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
 import { improveStory, generateVersionChangeDescription, generateClarifyingQuestions, splitStory } from '../services/ai';
 import ContentContainer from './ContentContainer';
 import VersionGraph from './VersionGraph';
@@ -28,7 +27,13 @@ const StoryView = ({ storyId }) => {
     const [selectedVersionId, setSelectedVersionId] = useState(null);
     const [askClarifyingQuestions, setAskClarifyingQuestions] = useState(false);
     const [clarifyingQuestions, setClarifyingQuestions] = useState(null);
+
     const [answers, setAnswers] = useState({});
+    const [rewriteSelection, setRewriteSelection] = useState({
+        title: true,
+        description: true,
+        acceptanceCriteria: true
+    });
 
     // Split Story State
     const [isSplitting, setIsSplitting] = useState(false);
@@ -101,6 +106,12 @@ const StoryView = ({ storyId }) => {
             return;
         }
 
+        const hasSelection = Object.values(rewriteSelection).some(v => v);
+        if (!hasSelection) {
+            setError('Please select at least one part of the story to rewrite.');
+            return;
+        }
+
         setIsImproving(true);
         setError(null);
         setClarifyingQuestions(null);
@@ -120,14 +131,14 @@ const StoryView = ({ storyId }) => {
                     const improved = await improveStory(formData, settings, {
                         context: projectContext?.context,
                         systemPrompt: projectContext?.systemPrompt
-                    });
+                    }, null, rewriteSelection);
                     setAiSuggestion(improved);
                 }
             } else {
                 const improved = await improveStory(formData, settings, {
                     context: projectContext?.context,
                     systemPrompt: projectContext?.systemPrompt
-                });
+                }, null, rewriteSelection);
                 setAiSuggestion(improved);
             }
         } catch (err) {
@@ -156,7 +167,7 @@ const StoryView = ({ storyId }) => {
             const improved = await improveStory(formData, settings, {
                 context: projectContext?.context,
                 systemPrompt: projectContext?.systemPrompt
-            }, qaContext);
+            }, qaContext, rewriteSelection);
             setAiSuggestion(improved);
             setClarifyingQuestions(null); // Clear questions after success
         } catch (err) {
@@ -439,8 +450,39 @@ const StoryView = ({ storyId }) => {
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', opacity: 0.8 }}>
                             <Sparkles size={48} color="var(--color-accent)" />
                             <p style={{ fontSize: '1.1rem', textAlign: 'center', maxWidth: '400px' }}>
-                                Use AI to rewrite and improve your story. This will generate a new title, description, and acceptance criteria based on the current content.
+                                Use AI to rewrite and improve your story. Select which parts you want to rewrite.
                             </p>
+
+                            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1rem' }}>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={rewriteSelection.title}
+                                        onChange={(e) => setRewriteSelection(prev => ({ ...prev, title: e.target.checked }))}
+                                        style={{ width: '1.1rem', height: '1.1rem' }}
+                                    />
+                                    Title
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={rewriteSelection.description}
+                                        onChange={(e) => setRewriteSelection(prev => ({ ...prev, description: e.target.checked }))}
+                                        style={{ width: '1.1rem', height: '1.1rem' }}
+                                    />
+                                    Description
+                                </label>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={rewriteSelection.acceptanceCriteria}
+                                        onChange={(e) => setRewriteSelection(prev => ({ ...prev, acceptanceCriteria: e.target.checked }))}
+                                        style={{ width: '1.1rem', height: '1.1rem' }}
+                                    />
+                                    Acceptance Criteria
+                                </label>
+                            </div>
+
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
                                 <input
                                     type="checkbox"
@@ -542,15 +584,15 @@ const StoryView = ({ storyId }) => {
 
                             <div style={{ marginBottom: '1.5rem' }}>
                                 <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Description:</strong>
-                                <div style={{ padding: '1rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '4px' }}>
-                                    <ReactMarkdown>{aiSuggestion.description}</ReactMarkdown>
+                                <div style={{ padding: '1rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '4px', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+                                    {aiSuggestion.description}
                                 </div>
                             </div>
 
                             <div style={{ marginBottom: '1.5rem' }}>
                                 <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Acceptance Criteria:</strong>
-                                <div style={{ padding: '1rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '4px' }}>
-                                    <ReactMarkdown>{aiSuggestion.acceptanceCriteria}</ReactMarkdown>
+                                <div style={{ padding: '1rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '4px', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+                                    {aiSuggestion.acceptanceCriteria}
                                 </div>
                             </div>
 
@@ -623,11 +665,11 @@ const StoryView = ({ storyId }) => {
                                         <h3 style={{ marginBottom: '1rem' }}>{story.title}</h3>
                                         <div style={{ marginBottom: '1rem' }}>
                                             <strong>Description:</strong>
-                                            <div style={{ marginTop: '0.5rem' }}><ReactMarkdown>{story.description}</ReactMarkdown></div>
+                                            <div style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{story.description}</div>
                                         </div>
                                         <div>
                                             <strong>Acceptance Criteria:</strong>
-                                            <div style={{ marginTop: '0.5rem' }}><ReactMarkdown>{story.acceptanceCriteria}</ReactMarkdown></div>
+                                            <div style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{story.acceptanceCriteria}</div>
                                         </div>
                                     </div>
                                 ) : splitStories[activeSplitTab - 1] ? (
@@ -635,11 +677,11 @@ const StoryView = ({ storyId }) => {
                                         <h3 style={{ marginBottom: '1rem' }}>{splitStories[activeSplitTab - 1].title}</h3>
                                         <div style={{ marginBottom: '1rem' }}>
                                             <strong>Description:</strong>
-                                            <div style={{ marginTop: '0.5rem' }}><ReactMarkdown>{splitStories[activeSplitTab - 1].description}</ReactMarkdown></div>
+                                            <div style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{splitStories[activeSplitTab - 1].description}</div>
                                         </div>
                                         <div>
                                             <strong>Acceptance Criteria:</strong>
-                                            <div style={{ marginTop: '0.5rem' }}><ReactMarkdown>{splitStories[activeSplitTab - 1].acceptanceCriteria}</ReactMarkdown></div>
+                                            <div style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{splitStories[activeSplitTab - 1].acceptanceCriteria}</div>
                                         </div>
                                     </div>
                                 ) : (
@@ -741,14 +783,14 @@ const StoryView = ({ storyId }) => {
                             </div>
                             <div style={{ marginBottom: '1rem' }}>
                                 <strong>Description:</strong>
-                                <div style={{ padding: '0.5rem', backgroundColor: 'var(--color-bg-primary)', borderRadius: '4px', marginTop: '0.5rem' }}>
-                                    <ReactMarkdown>{selectedVersion.description}</ReactMarkdown>
+                                <div style={{ padding: '0.5rem', backgroundColor: 'var(--color-bg-primary)', borderRadius: '4px', marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+                                    {selectedVersion.description}
                                 </div>
                             </div>
                             <div>
                                 <strong>Acceptance Criteria:</strong>
-                                <div style={{ padding: '0.5rem', backgroundColor: 'var(--color-bg-primary)', borderRadius: '4px', marginTop: '0.5rem' }}>
-                                    <ReactMarkdown>{selectedVersion.acceptanceCriteria}</ReactMarkdown>
+                                <div style={{ padding: '0.5rem', backgroundColor: 'var(--color-bg-primary)', borderRadius: '4px', marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+                                    {selectedVersion.acceptanceCriteria}
                                 </div>
                             </div>
                         </div>
