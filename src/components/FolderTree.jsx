@@ -279,7 +279,7 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
                                     <FileText size={12} style={{ marginRight: '0.5rem', minWidth: '12px', color: drafts[storyId] ? 'var(--color-warning)' : 'var(--color-success)' }} />
                                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{story.title}</span>
                                     {unsavedStories[storyId] && (
-                                        <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', marginLeft: '6px', flexShrink: 0 }}></div>
+                                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', marginLeft: '6px', flexShrink: 0 }} title="Unsaved Changes"></div>
                                     )}
                                 </div>
                                 <button
@@ -371,7 +371,7 @@ const FolderTree = ({ rootFolderId, onSelectStory, selectedStoryId, searchTerm }
                             <FileText size={12} style={{ marginRight: '0.5rem', minWidth: '12px', color: drafts[storyId] ? 'var(--color-warning)' : 'var(--color-success)' }} />
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{story.title}</span>
                             {unsavedStories[storyId] && (
-                                <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', marginLeft: '6px', flexShrink: 0 }}></div>
+                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', marginLeft: '6px', flexShrink: 0 }} title="Unsaved Changes"></div>
                             )}
                         </div>
                         <button

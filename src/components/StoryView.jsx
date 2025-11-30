@@ -140,6 +140,10 @@ const StoryView = ({ storyId }) => {
             return;
         }
 
+        if (unsavedStories[storyId]) {
+            handleSave();
+        }
+
         const hasSelection = Object.values(rewriteSelection).some(v => v);
         if (!hasSelection) {
             setError('Please select at least one part of the story to rewrite.');
@@ -268,6 +272,10 @@ const StoryView = ({ storyId }) => {
             return;
         }
 
+        if (unsavedStories[storyId]) {
+            handleSave();
+        }
+
         setIsSplitting(true);
         setError(null);
         setSplitStories(null);
@@ -351,44 +359,10 @@ const StoryView = ({ storyId }) => {
                 <h2 style={{ fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     {story.title}
                     {unsavedStories[storyId] && (
-                        <span style={{ fontSize: '0.8rem', color: 'var(--color-warning)', backgroundColor: 'rgba(245, 158, 11, 0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--color-warning)' }}>
-                            {drafts[storyId] ? 'Unsaved Draft Restored' : 'Unsaved Changes'}
-                        </span>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', flexShrink: 0 }} title="Unsaved Changes"></div>
                     )}
                 </h2>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    {activeTab === 'edit' && unsavedStories[storyId] && (
-                        <button
-                            onClick={handleDiscard}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                backgroundColor: 'var(--color-bg-secondary)',
-                                border: '1px solid var(--color-border)',
-                                color: 'var(--color-text)',
-                                padding: '0.5rem 1rem'
-                            }}
-                        >
-                            <RotateCcw size={16} /> Discard Changes
-                        </button>
-                    )}
-                    {activeTab === 'edit' && (
-                        <button
-                            onClick={handleSave}
-                            disabled={!unsavedStories[storyId]}
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                opacity: unsavedStories[storyId] ? 1 : 0.5,
-                                cursor: unsavedStories[storyId] ? 'pointer' : 'default'
-                            }}
-                        >
-                            <Save size={16} /> Save
-                        </button>
-                    )}
-                </div>
+                {/* Buttons moved to Edit Story tab */}
             </div>
 
             <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', marginBottom: '1.5rem' }}>
@@ -463,6 +437,46 @@ const StoryView = ({ storyId }) => {
 
             {activeTab === 'edit' ? (
                 <div className="editor-column">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                        <div>
+                            {unsavedStories[storyId] && (
+                                <span style={{ fontSize: '0.8rem', color: 'var(--color-warning)', backgroundColor: 'rgba(245, 158, 11, 0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--color-warning)' }}>
+                                    {drafts[storyId] ? 'Unsaved Draft Restored' : 'Unsaved Changes'}
+                                </span>
+                            )}
+                        </div>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            {unsavedStories[storyId] && (
+                                <button
+                                    onClick={handleDiscard}
+                                    style={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '0.5rem',
+                                        backgroundColor: 'var(--color-bg-secondary)',
+                                        border: '1px solid var(--color-border)',
+                                        color: 'var(--color-text)',
+                                        padding: '0.5rem 1rem'
+                                    }}
+                                >
+                                    <RotateCcw size={16} /> Discard Changes
+                                </button>
+                            )}
+                            <button
+                                onClick={handleSave}
+                                disabled={!unsavedStories[storyId]}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '0.5rem',
+                                    opacity: unsavedStories[storyId] ? 1 : 0.5,
+                                    cursor: unsavedStories[storyId] ? 'pointer' : 'default'
+                                }}
+                            >
+                                <Save size={16} /> Save
+                            </button>
+                        </div>
+                    </div>
                     <div style={{ marginBottom: '1.5rem' }}>
                         <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Title</label>
                         <input
@@ -547,6 +561,11 @@ const StoryView = ({ storyId }) => {
                                     Ask clarifying questions
                                 </label>
                             </div>
+                            {unsavedStories[storyId] && (
+                                <p style={{ color: 'var(--color-warning)', marginBottom: '1rem', fontStyle: 'italic' }}>
+                                    Note: Proceeding will save your current changes.
+                                </p>
+                            )}
                             <button
                                 onClick={handleImprove}
                                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--color-accent)', fontSize: '1.1rem', padding: '0.75rem 1.5rem' }}
@@ -663,6 +682,11 @@ const StoryView = ({ storyId }) => {
                             <p style={{ fontSize: '1.1rem', textAlign: 'center', maxWidth: '400px' }}>
                                 Use AI to split this story into multiple smaller, independent stories.
                             </p>
+                            {unsavedStories[storyId] && (
+                                <p style={{ color: 'var(--color-warning)', marginBottom: '1rem', fontStyle: 'italic' }}>
+                                    Note: Proceeding will save your current changes.
+                                </p>
+                            )}
                             <button
                                 onClick={handleSplit}
                                 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--color-accent)', fontSize: '1.1rem', padding: '0.75rem 1.5rem' }}
