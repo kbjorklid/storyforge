@@ -141,14 +141,17 @@ const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
             ref={sidebarRef}
             style={{
                 width: `${width}px`,
-                backgroundColor: 'var(--color-bg-secondary)',
-                borderRight: '1px solid var(--color-border)',
+                background: 'var(--glass-bg)',
+                backdropFilter: 'blur(var(--backdrop-blur))',
+                WebkitBackdropFilter: 'blur(var(--backdrop-blur))',
+                borderRight: '1px solid var(--glass-border)',
                 display: 'flex',
                 flexDirection: 'column',
                 padding: '1rem',
                 height: '100vh',
                 position: 'relative',
-                flexShrink: 0
+                flexShrink: 0,
+                boxShadow: 'var(--glass-shadow)'
             }}
         >
             <div

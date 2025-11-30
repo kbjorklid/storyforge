@@ -5,6 +5,83 @@ import { improveStory, generateClarifyingQuestions, splitStory } from '../servic
 import ContentContainer from './ContentContainer';
 import VersionGraph from './VersionGraph';
 import CopyControl from './CopyControl';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const TabButton = ({ active, onClick, icon: Icon, label }) => (
+    <button
+        onClick={onClick}
+        style={{
+            padding: '0.75rem 1.5rem',
+            color: active ? 'var(--color-accent)' : 'var(--color-text-secondary)',
+            fontWeight: active ? '600' : '500',
+            background: 'none',
+            border: 'none',
+            borderRadius: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            position: 'relative',
+            cursor: 'pointer',
+            transition: 'color 0.3s ease'
+        }}
+    >
+        <Icon size={16} /> {label}
+        {active && (
+            <motion.div
+                layoutId="activeTab"
+                style={{
+                    position: 'absolute',
+                    bottom: '-1px',
+                    left: 0,
+                    right: 0,
+                    height: '2px',
+                    backgroundColor: 'var(--color-accent)',
+                    boxShadow: '0 0 8px var(--color-accent-glow)'
+                }}
+            />
+        )}
+    </button>
+);
+
+const LoadingAnimation = ({ text }) => (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1.5rem' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            {[0, 1, 2].map((i) => (
+                <motion.div
+                    key={i}
+                    style={{
+                        width: '12px',
+                        height: '12px',
+                        borderRadius: '50%',
+                        backgroundColor: 'var(--color-accent)'
+                    }}
+                    animate={{
+                        scale: [1, 1.5, 1],
+                        opacity: [0.5, 1, 0.5],
+                        boxShadow: [
+                            '0 0 0px var(--color-accent-glow)',
+                            '0 0 10px var(--color-accent-glow)',
+                            '0 0 0px var(--color-accent-glow)'
+                        ]
+                    }}
+                    transition={{
+                        duration: 1,
+                        repeat: Infinity,
+                        delay: i * 0.2,
+                        ease: "easeInOut"
+                    }}
+                />
+            ))}
+        </div>
+        <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            style={{ fontSize: '1.1rem', color: 'var(--color-text-secondary)' }}
+        >
+            {text}
+        </motion.p>
+    </div>
+);
 
 const StoryView = ({ storyId }) => {
     const { stories, saveStory, restoreVersion, settings, updateVersion, projects, addStory, deleteStory, unsavedStories, setStoryUnsaved, drafts, saveDraft, discardDraft, triggerVersionTitleGeneration } = useStore();
@@ -430,601 +507,592 @@ const StoryView = ({ storyId }) => {
                 {/* Buttons moved to Edit Story tab */}
             </div>
 
-            <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', marginBottom: '1.5rem' }}>
-                <button
-                    onClick={() => setActiveTab('edit')}
-                    style={{
-                        padding: '0.75rem 1.5rem',
-                        borderBottom: activeTab === 'edit' ? '2px solid var(--color-accent)' : 'none',
-                        color: activeTab === 'edit' ? 'var(--color-text)' : 'var(--color-text-muted)',
-                        fontWeight: activeTab === 'edit' ? '600' : '400',
-                        background: 'none',
-                        borderRadius: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                    }}
-                >
-                    <Edit size={16} /> Edit Story
-                </button>
-                <button
-                    onClick={() => setActiveTab('rewrite')}
-                    style={{
-                        padding: '0.75rem 1.5rem',
-                        borderBottom: activeTab === 'rewrite' ? '2px solid var(--color-accent)' : 'none',
-                        color: activeTab === 'rewrite' ? 'var(--color-text)' : 'var(--color-text-muted)',
-                        fontWeight: activeTab === 'rewrite' ? '600' : '400',
-                        background: 'none',
-                        borderRadius: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                    }}
-                >
-                    <Sparkles size={16} /> Rewrite Story
-                </button>
-                <button
-                    onClick={() => setActiveTab('split')}
-                    style={{
-                        padding: '0.75rem 1.5rem',
-                        borderBottom: activeTab === 'split' ? '2px solid var(--color-accent)' : 'none',
-                        color: activeTab === 'split' ? 'var(--color-text)' : 'var(--color-text-muted)',
-                        fontWeight: activeTab === 'split' ? '600' : '400',
-                        background: 'none',
-                        borderRadius: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                    }}
-                >
-                    <Scissors size={16} /> Split Story
-                </button>
-                <button
-                    onClick={() => setActiveTab('versions')}
-                    style={{
-                        padding: '0.75rem 1.5rem',
-                        borderBottom: activeTab === 'versions' ? '2px solid var(--color-accent)' : 'none',
-                        color: activeTab === 'versions' ? 'var(--color-text)' : 'var(--color-text-muted)',
-                        fontWeight: activeTab === 'versions' ? '600' : '400',
-                        background: 'none',
-                        borderRadius: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                    }}
-                >
-                    <GitBranch size={16} /> Versions
-                </button>
+            <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', marginBottom: '1.5rem', position: 'relative' }}>
+                <TabButton active={activeTab === 'edit'} onClick={() => setActiveTab('edit')} icon={Edit} label="Edit Story" />
+                <TabButton active={activeTab === 'rewrite'} onClick={() => setActiveTab('rewrite')} icon={Sparkles} label="Rewrite Story" />
+                <TabButton active={activeTab === 'split'} onClick={() => setActiveTab('split')} icon={Scissors} label="Split Story" />
+                <TabButton active={activeTab === 'versions'} onClick={() => setActiveTab('versions')} icon={GitBranch} label="Versions" />
             </div>
 
             {error && (
-                <div style={{ padding: '1rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', borderRadius: '4px', marginBottom: '1rem' }}>
+                <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{ padding: '1rem', backgroundColor: 'rgba(239, 68, 68, 0.1)', color: 'var(--color-danger)', borderRadius: '4px', marginBottom: '1rem' }}
+                >
                     {error}
-                </div>
+                </motion.div>
             )}
 
-            {activeTab === 'edit' ? (
-                <div className="editor-column">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                        <div>
-                            {unsavedStories[storyId] && (
-                                <span style={{ fontSize: '0.8rem', color: 'var(--color-warning)', backgroundColor: 'rgba(245, 158, 11, 0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--color-warning)' }}>
-                                    {drafts[storyId] ? 'Unsaved Draft Restored' : 'Unsaved Changes'}
-                                </span>
-                            )}
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            {unsavedStories[storyId] && (
-                                <button
-                                    onClick={handleDiscard}
+            <AnimatePresence mode="wait">
+                {activeTab === 'edit' && (
+                    <motion.div
+                        key="edit"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        transition={{ duration: 0.2 }}
+                        className="editor-column"
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                            <div>
+                                {unsavedStories[storyId] && (
+                                    <span style={{ fontSize: '0.8rem', color: 'var(--color-warning)', backgroundColor: 'rgba(245, 158, 11, 0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--color-warning)' }}>
+                                        {drafts[storyId] ? 'Unsaved Draft Restored' : 'Unsaved Changes'}
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                {unsavedStories[storyId] && (
+                                    <button
+                                        onClick={handleDiscard}
+                                        style={{
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '0.5rem',
+                                            backgroundColor: 'var(--color-bg-secondary)',
+                                            border: '1px solid var(--color-border)',
+                                            color: 'var(--color-text)',
+                                            padding: '0.5rem 1rem'
+                                        }}
+                                    >
+                                        <RotateCcw size={16} /> Discard Changes
+                                    </button>
+                                )}
+                                <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={handleSave}
+                                    disabled={!unsavedStories[storyId]}
                                     style={{
                                         display: 'flex',
                                         alignItems: 'center',
                                         gap: '0.5rem',
-                                        backgroundColor: 'var(--color-bg-secondary)',
-                                        border: '1px solid var(--color-border)',
-                                        color: 'var(--color-text)',
+                                        opacity: unsavedStories[storyId] ? 1 : 0.5,
+                                        cursor: unsavedStories[storyId] ? 'pointer' : 'default',
+                                        backgroundColor: 'var(--color-accent)',
+                                        color: 'white',
+                                        border: 'none',
                                         padding: '0.5rem 1rem'
                                     }}
                                 >
-                                    <RotateCcw size={16} /> Discard Changes
-                                </button>
-                            )}
-                            <button
-                                onClick={handleSave}
-                                disabled={!unsavedStories[storyId]}
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.5rem',
-                                    opacity: unsavedStories[storyId] ? 1 : 0.5,
-                                    cursor: unsavedStories[storyId] ? 'pointer' : 'default'
-                                }}
-                            >
-                                <Save size={16} /> Save
-                            </button>
-                        </div>
-                    </div>
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                            <label style={{ fontWeight: '500', margin: 0 }}>Title</label>
-                            <CopyControl text={formData.title} />
-                        </div>
-                        <input
-                            type="text"
-                            name="title"
-                            value={formData.title}
-                            onChange={handleChange}
-                            style={{ width: '100%', fontSize: '1.1rem' }}
-                        />
-                    </div>
-
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                            <label style={{ fontWeight: '500', margin: 0 }}>Description</label>
-                            <CopyControl text={formData.description} />
-                        </div>
-                        <textarea
-                            name="description"
-                            value={formData.description}
-                            onChange={handleChange}
-                            rows={8}
-                            style={{ width: '100%', resize: 'vertical' }}
-                        />
-                    </div>
-
-                    <div style={{ marginBottom: '1.5rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                            <label style={{ fontWeight: '500', margin: 0 }}>Acceptance Criteria</label>
-                            <CopyControl text={formData.acceptanceCriteria} />
-                        </div>
-                        <textarea
-                            name="acceptanceCriteria"
-                            value={formData.acceptanceCriteria}
-                            onChange={handleChange}
-                            rows={8}
-                            style={{ width: '100%', resize: 'vertical' }}
-                        />
-                    </div>
-                </div>
-            ) : activeTab === 'rewrite' ? (
-                <div className="rewrite-column" style={{ minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
-                    {!aiSuggestion && !isImproving && !clarifyingQuestions ? (
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', opacity: 0.8 }}>
-                            <Sparkles size={48} color="var(--color-accent)" />
-                            <p style={{ fontSize: '1.1rem', textAlign: 'center', maxWidth: '400px' }}>
-                                Use AI to rewrite and improve your story. Select which parts you want to rewrite.
-                            </p>
-
-                            <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1rem' }}>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={rewriteSelection.title}
-                                        onChange={(e) => setRewriteSelection(prev => ({ ...prev, title: e.target.checked }))}
-                                        style={{ width: '1.1rem', height: '1.1rem' }}
-                                    />
-                                    Title
-                                </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={rewriteSelection.description}
-                                        onChange={(e) => setRewriteSelection(prev => ({ ...prev, description: e.target.checked }))}
-                                        style={{ width: '1.1rem', height: '1.1rem' }}
-                                    />
-                                    Description
-                                </label>
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                    <input
-                                        type="checkbox"
-                                        checked={rewriteSelection.acceptanceCriteria}
-                                        onChange={(e) => setRewriteSelection(prev => ({ ...prev, acceptanceCriteria: e.target.checked }))}
-                                        style={{ width: '1.1rem', height: '1.1rem' }}
-                                    />
-                                    Acceptance Criteria
-                                </label>
+                                    <Save size={16} /> Save
+                                </motion.button>
                             </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                                <input
-                                    type="checkbox"
-                                    id="askClarifyingQuestions"
-                                    checked={askClarifyingQuestions}
-                                    onChange={(e) => setAskClarifyingQuestions(e.target.checked)}
-                                    style={{ width: '1.2rem', height: '1.2rem' }}
-                                />
-                                <label htmlFor="askClarifyingQuestions" style={{ fontSize: '1.1rem', cursor: 'pointer' }}>
-                                    Ask clarifying questions
-                                </label>
+                        </div>
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                <label style={{ fontWeight: '500', margin: 0 }}>Title</label>
+                                <CopyControl text={formData.title} />
                             </div>
-                            {unsavedStories[storyId] && (
-                                <p style={{ color: 'var(--color-warning)', marginBottom: '1rem', fontStyle: 'italic' }}>
-                                    Note: Proceeding will save your current changes.
+                            <input
+                                type="text"
+                                name="title"
+                                value={formData.title}
+                                onChange={handleChange}
+                                style={{ width: '100%', fontSize: '1.1rem' }}
+                            />
+                        </div>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                <label style={{ fontWeight: '500', margin: 0 }}>Description</label>
+                                <CopyControl text={formData.description} />
+                            </div>
+                            <textarea
+                                name="description"
+                                value={formData.description}
+                                onChange={handleChange}
+                                rows={8}
+                                style={{ width: '100%', resize: 'vertical' }}
+                            />
+                        </div>
+
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                                <label style={{ fontWeight: '500', margin: 0 }}>Acceptance Criteria</label>
+                                <CopyControl text={formData.acceptanceCriteria} />
+                            </div>
+                            <textarea
+                                name="acceptanceCriteria"
+                                value={formData.acceptanceCriteria}
+                                onChange={handleChange}
+                                rows={8}
+                                style={{ width: '100%', resize: 'vertical' }}
+                            />
+                        </div>
+                    </motion.div>
+                )}
+
+                {activeTab === 'rewrite' && (
+                    <motion.div
+                        key="rewrite"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        transition={{ duration: 0.2 }}
+                        className="rewrite-column"
+                        style={{ minHeight: '400px', display: 'flex', flexDirection: 'column' }}
+                    >
+                        {!aiSuggestion && !isImproving && !clarifyingQuestions ? (
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', opacity: 0.8 }}>
+                                <Sparkles size={48} color="var(--color-accent)" />
+                                <p style={{ fontSize: '1.1rem', textAlign: 'center', maxWidth: '400px' }}>
+                                    Use AI to rewrite and improve your story. Select which parts you want to rewrite.
                                 </p>
-                            )}
-                            <button
-                                onClick={handleImprove}
-                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--color-accent)', fontSize: '1.1rem', padding: '0.75rem 1.5rem' }}
-                            >
-                                <Sparkles size={20} />
-                                Improve with AI
-                            </button>
-                        </div>
-                    ) : isImproving ? (
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
-                            <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid var(--color-bg-secondary)', borderTop: '4px solid var(--color-accent)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-                            <p style={{ fontSize: '1.1rem' }}>{clarifyingQuestions ? 'Generating rewrite...' : 'Processing...'}</p>
-                        </div>
-                    ) : clarifyingQuestions ? (
-                        <div className="questions-column" style={{ border: '1px solid var(--color-accent)', borderRadius: '8px', padding: '1.5rem', backgroundColor: 'var(--color-bg-secondary)' }}>
-                            <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Sparkles size={20} /> Clarifying Questions
-                            </h3>
-                            <p style={{ marginBottom: '1.5rem' }}>Please answer the following questions to help the AI improve your story.</p>
 
-                            {clarifyingQuestions.map((q, index) => (
-                                <div key={q.id || index} style={{ marginBottom: '1.5rem' }}>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>{index + 1}. {q.text}</label>
-
-                                    {q.type === 'text' && (
-                                        <textarea
-                                            value={answers[q.id] || ''}
-                                            onChange={(e) => handleAnswerChange(q.id, e.target.value, 'text')}
-                                            rows={3}
-                                            style={{ width: '100%', resize: 'vertical' }}
+                                <div style={{ display: 'flex', gap: '1.5rem', marginBottom: '1rem' }}>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={rewriteSelection.title}
+                                            onChange={(e) => setRewriteSelection(prev => ({ ...prev, title: e.target.checked }))}
+                                            style={{ width: '1.1rem', height: '1.1rem' }}
                                         />
-                                    )}
-
-                                    {q.type === 'single_select' && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            {q.options?.map((option, i) => (
-                                                <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                                    <input
-                                                        type="radio"
-                                                        name={`question-${q.id}`}
-                                                        value={option}
-                                                        checked={answers[q.id] === option}
-                                                        onChange={(e) => handleAnswerChange(q.id, e.target.value, 'single_select')}
-                                                    />
-                                                    {option}
-                                                </label>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {q.type === 'multi_select' && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            {q.options?.map((option, i) => (
-                                                <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        value={option}
-                                                        checked={(answers[q.id] || []).includes(option)}
-                                                        onChange={() => handleAnswerChange(q.id, option, 'multi_select')}
-                                                    />
-                                                    {option}
-                                                </label>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            ))}
-
-                            <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'flex-end' }}>
-                                <button onClick={() => setClarifyingQuestions(null)} style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', padding: '0.75rem 1.5rem' }}>Cancel</button>
-                                <button onClick={handleSubmitAnswers} style={{ backgroundColor: 'var(--color-accent)', color: 'white', padding: '0.75rem 1.5rem' }}>Submit Answers & Rewrite</button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="suggestion-column" style={{ border: '1px solid var(--color-accent)', borderRadius: '8px', padding: '1.5rem', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>
-                            <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Sparkles size={20} /> AI Suggestion
-                            </h3>
-
-                            <div style={{ marginBottom: '1.5rem' }}>
-                                <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Title:</strong>
-                                <div style={{ padding: '0.75rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '4px', fontSize: '1.1rem' }}>
-                                    {aiSuggestion.title}
-                                </div>
-                            </div>
-
-                            <div style={{ marginBottom: '1.5rem' }}>
-                                <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Description:</strong>
-                                <div style={{ padding: '1rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '4px', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
-                                    {aiSuggestion.description}
-                                </div>
-                            </div>
-
-                            <div style={{ marginBottom: '1.5rem' }}>
-                                <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Acceptance Criteria:</strong>
-                                <div style={{ padding: '1rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '4px', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
-                                    {aiSuggestion.acceptanceCriteria}
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'flex-end' }}>
-                                <button onClick={rejectSuggestion} style={{ backgroundColor: 'var(--color-danger)', color: 'white', padding: '0.75rem 1.5rem' }}>Reject</button>
-                                <button onClick={applySuggestion} style={{ backgroundColor: 'var(--color-success)', color: 'white', padding: '0.75rem 1.5rem' }}>Accept Changes</button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            ) : activeTab === 'split' ? (
-                <div className="split-column" style={{ minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
-                    {!splitStories && !isSplitting && !splitClarifyingQuestions ? (
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', opacity: 0.8 }}>
-                            <Scissors size={48} color="var(--color-accent)" />
-                            <p style={{ fontSize: '1.1rem', textAlign: 'center', maxWidth: '400px' }}>
-                                Use AI to split this story into multiple smaller, independent stories.
-                            </p>
-
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                                <input
-                                    type="checkbox"
-                                    id="askSplitClarifyingQuestions"
-                                    checked={askSplitClarifyingQuestions}
-                                    onChange={(e) => setAskSplitClarifyingQuestions(e.target.checked)}
-                                    style={{ width: '1.2rem', height: '1.2rem' }}
-                                />
-                                <label htmlFor="askSplitClarifyingQuestions" style={{ fontSize: '1.1rem', cursor: 'pointer' }}>
-                                    Ask clarifying questions
-                                </label>
-                            </div>
-
-                            {unsavedStories[storyId] && (
-                                <p style={{ color: 'var(--color-warning)', marginBottom: '1rem', fontStyle: 'italic' }}>
-                                    Note: Proceeding will save your current changes.
-                                </p>
-                            )}
-                            <button
-                                onClick={handleSplit}
-                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--color-accent)', fontSize: '1.1rem', padding: '0.75rem 1.5rem' }}
-                            >
-                                <Scissors size={20} />
-                                Split Story
-                            </button>
-                        </div>
-                    ) : isSplitting ? (
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
-                            <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid var(--color-bg-secondary)', borderTop: '4px solid var(--color-accent)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-                            <p style={{ fontSize: '1.1rem' }}>{splitClarifyingQuestions ? 'Generating split stories...' : 'Splitting story...'}</p>
-                        </div>
-                    ) : splitClarifyingQuestions ? (
-                        <div className="questions-column" style={{ border: '1px solid var(--color-accent)', borderRadius: '8px', padding: '1.5rem', backgroundColor: 'var(--color-bg-secondary)' }}>
-                            <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Sparkles size={20} /> Clarifying Questions
-                            </h3>
-                            <p style={{ marginBottom: '1.5rem' }}>Please answer the following questions to help the AI split your story effectively.</p>
-
-                            {splitClarifyingQuestions.map((q, index) => (
-                                <div key={q.id || index} style={{ marginBottom: '1.5rem' }}>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>{index + 1}. {q.text}</label>
-
-                                    {q.type === 'text' && (
-                                        <textarea
-                                            value={splitAnswers[q.id] || ''}
-                                            onChange={(e) => handleSplitAnswerChange(q.id, e.target.value, 'text')}
-                                            rows={3}
-                                            style={{ width: '100%', resize: 'vertical' }}
+                                        Title
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={rewriteSelection.description}
+                                            onChange={(e) => setRewriteSelection(prev => ({ ...prev, description: e.target.checked }))}
+                                            style={{ width: '1.1rem', height: '1.1rem' }}
                                         />
-                                    )}
-
-                                    {q.type === 'single_select' && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            {q.options?.map((option, i) => (
-                                                <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                                    <input
-                                                        type="radio"
-                                                        name={`question-${q.id}`}
-                                                        value={option}
-                                                        checked={splitAnswers[q.id] === option}
-                                                        onChange={(e) => handleSplitAnswerChange(q.id, e.target.value, 'single_select')}
-                                                    />
-                                                    {option}
-                                                </label>
-                                            ))}
-                                        </div>
-                                    )}
-
-                                    {q.type === 'multi_select' && (
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                            {q.options?.map((option, i) => (
-                                                <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                                    <input
-                                                        type="checkbox"
-                                                        value={option}
-                                                        checked={(splitAnswers[q.id] || []).includes(option)}
-                                                        onChange={() => handleSplitAnswerChange(q.id, option, 'multi_select')}
-                                                    />
-                                                    {option}
-                                                </label>
-                                            ))}
-                                        </div>
-                                    )}
+                                        Description
+                                    </label>
+                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={rewriteSelection.acceptanceCriteria}
+                                            onChange={(e) => setRewriteSelection(prev => ({ ...prev, acceptanceCriteria: e.target.checked }))}
+                                            style={{ width: '1.1rem', height: '1.1rem' }}
+                                        />
+                                        Acceptance Criteria
+                                    </label>
                                 </div>
-                            ))}
 
-                            <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'flex-end' }}>
-                                <button onClick={() => setSplitClarifyingQuestions(null)} style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', padding: '0.75rem 1.5rem' }}>Cancel</button>
-                                <button onClick={handleSubmitSplitAnswers} style={{ backgroundColor: 'var(--color-accent)', color: 'white', padding: '0.75rem 1.5rem' }}>Submit Answers & Split</button>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="split-results" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-                            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-                                <button
-                                    onClick={() => setActiveSplitTab(0)}
-                                    style={{
-                                        padding: '0.5rem 1rem',
-                                        backgroundColor: activeSplitTab === 0 ? 'var(--color-accent)' : 'var(--color-bg-secondary)',
-                                        color: activeSplitTab === 0 ? 'white' : 'var(--color-text)',
-                                        border: '1px solid var(--color-border)',
-                                        borderRadius: '4px',
-                                        whiteSpace: 'nowrap'
-                                    }}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                                    <input
+                                        type="checkbox"
+                                        id="askClarifyingQuestions"
+                                        checked={askClarifyingQuestions}
+                                        onChange={(e) => setAskClarifyingQuestions(e.target.checked)}
+                                        style={{ width: '1.2rem', height: '1.2rem' }}
+                                    />
+                                    <label htmlFor="askClarifyingQuestions" style={{ fontSize: '1.1rem', cursor: 'pointer' }}>
+                                        Ask clarifying questions
+                                    </label>
+                                </div>
+                                {unsavedStories[storyId] && (
+                                    <p style={{ color: 'var(--color-warning)', marginBottom: '1rem', fontStyle: 'italic' }}>
+                                        Note: Proceeding will save your current changes.
+                                    </p>
+                                )}
+                                <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={handleImprove}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--color-accent)', fontSize: '1.1rem', padding: '0.75rem 1.5rem', border: 'none', color: 'white', borderRadius: '8px' }}
                                 >
-                                    Original Story
-                                </button>
-                                {splitStories.map((s, i) => (
+                                    <Sparkles size={20} />
+                                    Improve with AI
+                                </motion.button>
+                            </div>
+                        ) : isImproving ? (
+                            <LoadingAnimation text={clarifyingQuestions ? 'Generating rewrite...' : 'Processing...'} />
+                        ) : clarifyingQuestions ? (
+                            <div className="questions-column" style={{ border: '1px solid var(--color-accent)', borderRadius: '8px', padding: '1.5rem', backgroundColor: 'var(--color-bg-secondary)' }}>
+                                <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Sparkles size={20} /> Clarifying Questions
+                                </h3>
+                                <p style={{ marginBottom: '1.5rem' }}>Please answer the following questions to help the AI improve your story.</p>
+
+                                {clarifyingQuestions.map((q, index) => (
+                                    <div key={q.id || index} style={{ marginBottom: '1.5rem' }}>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>{index + 1}. {q.text}</label>
+
+                                        {q.type === 'text' && (
+                                            <textarea
+                                                value={answers[q.id] || ''}
+                                                onChange={(e) => handleAnswerChange(q.id, e.target.value, 'text')}
+                                                rows={3}
+                                                style={{ width: '100%', resize: 'vertical' }}
+                                            />
+                                        )}
+
+                                        {q.type === 'single_select' && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                {q.options?.map((option, i) => (
+                                                    <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="radio"
+                                                            name={`question-${q.id}`}
+                                                            value={option}
+                                                            checked={answers[q.id] === option}
+                                                            onChange={(e) => handleAnswerChange(q.id, e.target.value, 'single_select')}
+                                                        />
+                                                        {option}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {q.type === 'multi_select' && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                {q.options?.map((option, i) => (
+                                                    <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            value={option}
+                                                            checked={(answers[q.id] || []).includes(option)}
+                                                            onChange={() => handleAnswerChange(q.id, option, 'multi_select')}
+                                                        />
+                                                        {option}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+
+                                <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'flex-end' }}>
+                                    <button onClick={() => setClarifyingQuestions(null)} style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', padding: '0.75rem 1.5rem' }}>Cancel</button>
+                                    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={handleSubmitAnswers} style={{ backgroundColor: 'var(--color-accent)', color: 'white', padding: '0.75rem 1.5rem', border: 'none', borderRadius: '8px' }}>Submit Answers & Rewrite</motion.button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="suggestion-column" style={{ border: '1px solid var(--color-accent)', borderRadius: '8px', padding: '1.5rem', backgroundColor: 'rgba(59, 130, 246, 0.05)' }}>
+                                <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Sparkles size={20} /> AI Suggestion
+                                </h3>
+
+                                <div style={{ marginBottom: '1.5rem' }}>
+                                    <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Title:</strong>
+                                    <div style={{ padding: '0.75rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '4px', fontSize: '1.1rem' }}>
+                                        {aiSuggestion.title}
+                                    </div>
+                                </div>
+
+                                <div style={{ marginBottom: '1.5rem' }}>
+                                    <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Description:</strong>
+                                    <div style={{ padding: '1rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '4px', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+                                        {aiSuggestion.description}
+                                    </div>
+                                </div>
+
+                                <div style={{ marginBottom: '1.5rem' }}>
+                                    <strong style={{ display: 'block', marginBottom: '0.5rem' }}>Acceptance Criteria:</strong>
+                                    <div style={{ padding: '1rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '4px', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+                                        {aiSuggestion.acceptanceCriteria}
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'flex-end' }}>
+                                    <button onClick={rejectSuggestion} style={{ backgroundColor: 'var(--color-danger)', color: 'white', padding: '0.75rem 1.5rem' }}>Reject</button>
+                                    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={applySuggestion} style={{ backgroundColor: 'var(--color-success)', color: 'white', padding: '0.75rem 1.5rem', border: 'none', borderRadius: '8px' }}>Accept Changes</motion.button>
+                                </div>
+                            </div>
+                        )}
+                    </motion.div>
+                )}
+
+                {activeTab === 'split' && (
+                    <motion.div
+                        key="split"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        transition={{ duration: 0.2 }}
+                        className="split-column"
+                        style={{ minHeight: '400px', display: 'flex', flexDirection: 'column' }}
+                    >
+                        {!splitStories && !isSplitting && !splitClarifyingQuestions ? (
+                            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', opacity: 0.8 }}>
+                                <Scissors size={48} color="var(--color-accent)" />
+                                <p style={{ fontSize: '1.1rem', textAlign: 'center', maxWidth: '400px' }}>
+                                    Use AI to split this story into multiple smaller, independent stories.
+                                </p>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                                    <input
+                                        type="checkbox"
+                                        id="askSplitClarifyingQuestions"
+                                        checked={askSplitClarifyingQuestions}
+                                        onChange={(e) => setAskSplitClarifyingQuestions(e.target.checked)}
+                                        style={{ width: '1.2rem', height: '1.2rem' }}
+                                    />
+                                    <label htmlFor="askSplitClarifyingQuestions" style={{ fontSize: '1.1rem', cursor: 'pointer' }}>
+                                        Ask clarifying questions
+                                    </label>
+                                </div>
+
+                                {unsavedStories[storyId] && (
+                                    <p style={{ color: 'var(--color-warning)', marginBottom: '1rem', fontStyle: 'italic' }}>
+                                        Note: Proceeding will save your current changes.
+                                    </p>
+                                )}
+                                <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={handleSplit}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--color-accent)', fontSize: '1.1rem', padding: '0.75rem 1.5rem', border: 'none', color: 'white', borderRadius: '8px' }}
+                                >
+                                    <Scissors size={20} />
+                                    Split Story
+                                </motion.button>
+                            </div>
+                        ) : isSplitting ? (
+                            <LoadingAnimation text={splitClarifyingQuestions ? 'Generating split stories...' : 'Splitting story...'} />
+                        ) : splitClarifyingQuestions ? (
+                            <div className="questions-column" style={{ border: '1px solid var(--color-accent)', borderRadius: '8px', padding: '1.5rem', backgroundColor: 'var(--color-bg-secondary)' }}>
+                                <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <Sparkles size={20} /> Clarifying Questions
+                                </h3>
+                                <p style={{ marginBottom: '1.5rem' }}>Please answer the following questions to help the AI split your story effectively.</p>
+
+                                {splitClarifyingQuestions.map((q, index) => (
+                                    <div key={q.id || index} style={{ marginBottom: '1.5rem' }}>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>{index + 1}. {q.text}</label>
+
+                                        {q.type === 'text' && (
+                                            <textarea
+                                                value={splitAnswers[q.id] || ''}
+                                                onChange={(e) => handleSplitAnswerChange(q.id, e.target.value, 'text')}
+                                                rows={3}
+                                                style={{ width: '100%', resize: 'vertical' }}
+                                            />
+                                        )}
+
+                                        {q.type === 'single_select' && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                {q.options?.map((option, i) => (
+                                                    <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="radio"
+                                                            name={`question-${q.id}`}
+                                                            value={option}
+                                                            checked={splitAnswers[q.id] === option}
+                                                            onChange={(e) => handleSplitAnswerChange(q.id, e.target.value, 'single_select')}
+                                                        />
+                                                        {option}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {q.type === 'multi_select' && (
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                                {q.options?.map((option, i) => (
+                                                    <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            value={option}
+                                                            checked={(splitAnswers[q.id] || []).includes(option)}
+                                                            onChange={() => handleSplitAnswerChange(q.id, option, 'multi_select')}
+                                                        />
+                                                        {option}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+
+                                <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'flex-end' }}>
+                                    <button onClick={() => setSplitClarifyingQuestions(null)} style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', padding: '0.75rem 1.5rem' }}>Cancel</button>
+                                    <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} onClick={handleSubmitSplitAnswers} style={{ backgroundColor: 'var(--color-accent)', color: 'white', padding: '0.75rem 1.5rem', border: 'none', borderRadius: '8px' }}>Submit Answers & Split</motion.button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="split-results" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+                                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
                                     <button
-                                        key={i}
-                                        onClick={() => setActiveSplitTab(i + 1)}
+                                        onClick={() => setActiveSplitTab(0)}
                                         style={{
                                             padding: '0.5rem 1rem',
-                                            backgroundColor: activeSplitTab === i + 1 ? 'var(--color-accent)' : 'var(--color-bg-secondary)',
-                                            color: activeSplitTab === i + 1 ? 'white' : 'var(--color-text)',
+                                            backgroundColor: activeSplitTab === 0 ? 'var(--color-accent)' : 'var(--color-bg-secondary)',
+                                            color: activeSplitTab === 0 ? 'white' : 'var(--color-text)',
                                             border: '1px solid var(--color-border)',
                                             borderRadius: '4px',
                                             whiteSpace: 'nowrap'
                                         }}
                                     >
-                                        Split Story {i + 1}
+                                        Original Story
                                     </button>
-                                ))}
-                            </div>
-
-                            <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', border: '1px solid var(--color-border)', borderRadius: '8px', backgroundColor: 'var(--color-bg-secondary)', marginBottom: '1.5rem' }}>
-                                {activeSplitTab === 0 ? (
-                                    <div>
-                                        <h3 style={{ marginBottom: '1rem' }}>{story.title}</h3>
-                                        <div style={{ marginBottom: '1rem' }}>
-                                            <strong>Description:</strong>
-                                            <div style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{story.description}</div>
-                                        </div>
-                                        <div>
-                                            <strong>Acceptance Criteria:</strong>
-                                            <div style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{story.acceptanceCriteria}</div>
-                                        </div>
-                                    </div>
-                                ) : splitStories[activeSplitTab - 1] ? (
-                                    <div>
-                                        <h3 style={{ marginBottom: '1rem' }}>{splitStories[activeSplitTab - 1].title}</h3>
-                                        <div style={{ marginBottom: '1rem' }}>
-                                            <strong>Description:</strong>
-                                            <div style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{splitStories[activeSplitTab - 1].description}</div>
-                                        </div>
-                                        <div>
-                                            <strong>Acceptance Criteria:</strong>
-                                            <div style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{splitStories[activeSplitTab - 1].acceptanceCriteria}</div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div>Story data not found.</div>
-                                )}
-                            </div>
-
-                            <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
-                                <div style={{ marginBottom: '1rem' }}>
-                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginBottom: '1rem' }}>
-                                        <input
-                                            type="checkbox"
-                                            checked={retainOriginal}
-                                            onChange={(e) => setRetainOriginal(e.target.checked)}
-                                            style={{ width: '1.2rem', height: '1.2rem' }}
-                                        />
-                                        <span style={{ fontSize: '1.1rem' }}>Retain original story</span>
-                                    </label>
-                                </div>
-
-                                <div style={{ marginBottom: '1rem' }}>
-                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Instructions for Re-splitting (optional)</label>
-                                    <div style={{ display: 'flex', gap: '1rem' }}>
-                                        <textarea
-                                            value={splitInstructions}
-                                            onChange={(e) => setSplitInstructions(e.target.value)}
-                                            placeholder="E.g., Split into 3 stories instead of 2..."
-                                            rows={2}
-                                            style={{ flex: 1, resize: 'vertical' }}
-                                        />
+                                    {splitStories.map((s, i) => (
                                         <button
-                                            onClick={handleReSplit}
-                                            disabled={!splitInstructions.trim()}
+                                            key={i}
+                                            onClick={() => setActiveSplitTab(i + 1)}
                                             style={{
-                                                backgroundColor: splitInstructions.trim() ? 'var(--color-accent)' : 'var(--color-bg-secondary)',
-                                                color: splitInstructions.trim() ? 'white' : 'var(--color-text-muted)',
-                                                cursor: splitInstructions.trim() ? 'pointer' : 'not-allowed',
-                                                padding: '0 1.5rem',
+                                                padding: '0.5rem 1rem',
+                                                backgroundColor: activeSplitTab === i + 1 ? 'var(--color-accent)' : 'var(--color-bg-secondary)',
+                                                color: activeSplitTab === i + 1 ? 'white' : 'var(--color-text)',
+                                                border: '1px solid var(--color-border)',
+                                                borderRadius: '4px',
                                                 whiteSpace: 'nowrap'
                                             }}
                                         >
-                                            Re-split
+                                            Split Story {i + 1}
                                         </button>
+                                    ))}
+                                </div>
+
+                                <div style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', border: '1px solid var(--color-border)', borderRadius: '8px', backgroundColor: 'var(--color-bg-secondary)', marginBottom: '1.5rem' }}>
+                                    {activeSplitTab === 0 ? (
+                                        <div>
+                                            <h3 style={{ marginBottom: '1rem' }}>{story.title}</h3>
+                                            <div style={{ marginBottom: '1rem' }}>
+                                                <strong>Description:</strong>
+                                                <div style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{story.description}</div>
+                                            </div>
+                                            <div>
+                                                <strong>Acceptance Criteria:</strong>
+                                                <div style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{story.acceptanceCriteria}</div>
+                                            </div>
+                                        </div>
+                                    ) : splitStories[activeSplitTab - 1] ? (
+                                        <div>
+                                            <h3 style={{ marginBottom: '1rem' }}>{splitStories[activeSplitTab - 1].title}</h3>
+                                            <div style={{ marginBottom: '1rem' }}>
+                                                <strong>Description:</strong>
+                                                <div style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{splitStories[activeSplitTab - 1].description}</div>
+                                            </div>
+                                            <div>
+                                                <strong>Acceptance Criteria:</strong>
+                                                <div style={{ marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>{splitStories[activeSplitTab - 1].acceptanceCriteria}</div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div>Story data not found.</div>
+                                    )}
+                                </div>
+
+                                <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1.5rem' }}>
+                                    <div style={{ marginBottom: '1rem' }}>
+                                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', marginBottom: '1rem' }}>
+                                            <input
+                                                type="checkbox"
+                                                checked={retainOriginal}
+                                                onChange={(e) => setRetainOriginal(e.target.checked)}
+                                                style={{ width: '1.2rem', height: '1.2rem' }}
+                                            />
+                                            <span style={{ fontSize: '1.1rem' }}>Retain original story</span>
+                                        </label>
+                                    </div>
+
+                                    <div style={{ marginBottom: '1rem' }}>
+                                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Instructions for Re-splitting (optional)</label>
+                                        <div style={{ display: 'flex', gap: '1rem' }}>
+                                            <textarea
+                                                value={splitInstructions}
+                                                onChange={(e) => setSplitInstructions(e.target.value)}
+                                                placeholder="E.g., Split into 3 stories instead of 2..."
+                                                rows={2}
+                                                style={{ flex: 1, resize: 'vertical' }}
+                                            />
+                                            <button
+                                                onClick={handleReSplit}
+                                                disabled={!splitInstructions.trim()}
+                                                style={{
+                                                    backgroundColor: splitInstructions.trim() ? 'var(--color-accent)' : 'var(--color-bg-secondary)',
+                                                    color: splitInstructions.trim() ? 'white' : 'var(--color-text-muted)',
+                                                    cursor: splitInstructions.trim() ? 'pointer' : 'not-allowed',
+                                                    padding: '0 1.5rem',
+                                                    whiteSpace: 'nowrap'
+                                                }}
+                                            >
+                                                Re-split
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
+                                        <button
+                                            onClick={() => setSplitStories(null)}
+                                            style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', padding: '0.75rem 1.5rem' }}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <motion.button
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            onClick={handleAcceptSplit}
+                                            style={{ backgroundColor: 'var(--color-success)', color: 'white', padding: '0.75rem 1.5rem', border: 'none', borderRadius: '8px' }}
+                                        >
+                                            Accept & Create Stories
+                                        </motion.button>
                                     </div>
                                 </div>
-
-                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '1rem' }}>
-                                    <button
-                                        onClick={() => setSplitStories(null)}
-                                        style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', padding: '0.75rem 1.5rem' }}
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={handleAcceptSplit}
-                                        style={{ backgroundColor: 'var(--color-success)', color: 'white', padding: '0.75rem 1.5rem' }}
-                                    >
-                                        Accept & Create Stories
-                                    </button>
-                                </div>
                             </div>
+                        )}
+                    </motion.div>
+                )}
+
+                {activeTab === 'versions' && (
+                    <motion.div
+                        key="versions"
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 20 }}
+                        transition={{ duration: 0.2 }}
+                        className="versions-column"
+                        style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '1rem' }}
+                    >
+                        <div style={{ height: '400px', flexShrink: 0 }}>
+                            <VersionGraph
+                                versions={story.versions}
+                                currentVersionId={story.currentVersionId}
+                                selectedVersionId={selectedVersionId}
+                                onSelect={handleVersionSelect}
+                                draft={drafts[storyId]}
+                            />
                         </div>
-                    )}
-                </div>
-            ) : (
-                <div className="versions-column" style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '1rem' }}>
-                    <div style={{ height: '400px', flexShrink: 0 }}>
-                        <VersionGraph
-                            versions={story.versions}
-                            currentVersionId={story.currentVersionId}
-                            selectedVersionId={selectedVersionId}
-                            onSelect={handleVersionSelect}
-                            draft={drafts[storyId]}
-                        />
-                    </div>
 
-                    {selectedVersion && (
-                        <div style={{ padding: '1.5rem', border: '1px solid var(--color-border)', borderRadius: '8px', backgroundColor: 'var(--color-bg-secondary)' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                                <h3 style={{ margin: 0 }}>Version Preview</h3>
-                                {selectedVersionId !== story.currentVersionId && (
-                                    <button
-                                        onClick={handleRestore}
-                                        style={{
-                                            backgroundColor: 'var(--color-accent)',
-                                            color: 'white',
-                                            padding: '0.5rem 1rem',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: '0.5rem'
-                                        }}
-                                    >
-                                        <GitBranch size={16} /> Restore this Version
-                                    </button>
-                                )}
-                            </div>
+                        {selectedVersion && (
+                            <div style={{ padding: '1.5rem', border: '1px solid var(--color-border)', borderRadius: '8px', backgroundColor: 'var(--color-bg-secondary)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                    <h3 style={{ margin: 0 }}>Version Preview</h3>
+                                    {selectedVersionId !== story.currentVersionId && (
+                                        <motion.button
+                                            whileHover={{ scale: 1.05 }}
+                                            whileTap={{ scale: 0.95 }}
+                                            onClick={handleRestore}
+                                            style={{
+                                                backgroundColor: 'var(--color-accent)',
+                                                color: 'white',
+                                                padding: '0.5rem 1rem',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '0.5rem',
+                                                border: 'none',
+                                                borderRadius: '8px'
+                                            }}
+                                        >
+                                            <GitBranch size={16} /> Restore this Version
+                                        </motion.button>
+                                    )}
+                                </div>
 
-                            <div style={{ marginBottom: '1rem' }}>
-                                <strong>Title:</strong> {selectedVersion.title}
-                            </div>
-                            <div style={{ marginBottom: '1rem' }}>
-                                <strong>Description:</strong>
-                                <div style={{ padding: '0.5rem', backgroundColor: 'var(--color-bg-primary)', borderRadius: '4px', marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
-                                    {selectedVersion.description}
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <strong>Title:</strong> {selectedVersion.title}
+                                </div>
+                                <div style={{ marginBottom: '1rem' }}>
+                                    <strong>Description:</strong>
+                                    <div style={{ padding: '0.5rem', backgroundColor: 'var(--color-bg-primary)', borderRadius: '4px', marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+                                        {selectedVersion.description}
+                                    </div>
+                                </div>
+                                <div>
+                                    <strong>Acceptance Criteria:</strong>
+                                    <div style={{ padding: '0.5rem', backgroundColor: 'var(--color-bg-primary)', borderRadius: '4px', marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
+                                        {selectedVersion.acceptanceCriteria}
+                                    </div>
                                 </div>
                             </div>
-                            <div>
-                                <strong>Acceptance Criteria:</strong>
-                                <div style={{ padding: '0.5rem', backgroundColor: 'var(--color-bg-primary)', borderRadius: '4px', marginTop: '0.5rem', whiteSpace: 'pre-wrap', fontFamily: 'inherit' }}>
-                                    {selectedVersion.acceptanceCriteria}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
+                        )}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </ContentContainer>
     );
 };
