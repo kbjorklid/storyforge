@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
 import { Sparkles, Save, GitBranch, Scissors, RotateCcw } from 'lucide-react';
-import { improveStory, generateVersionChangeDescription, generateClarifyingQuestions, splitStory } from '../services/ai';
+import { improveStory, generateClarifyingQuestions, splitStory } from '../services/ai';
 import ContentContainer from './ContentContainer';
 import VersionGraph from './VersionGraph';
 
 const StoryView = ({ storyId }) => {
-    const { stories, saveStory, restoreVersion, settings, updateVersion, projects, addStory, deleteStory, unsavedStories, setStoryUnsaved, drafts, saveDraft, discardDraft } = useStore();
+    const { stories, saveStory, restoreVersion, settings, updateVersion, projects, addStory, deleteStory, unsavedStories, setStoryUnsaved, drafts, saveDraft, discardDraft, triggerVersionTitleGeneration } = useStore();
     const story = stories[storyId];
     // const project = projects.find(p => p.id === story?.parentId) || projects.find(p => p.rootFolderId === story?.parentId);
 
@@ -113,14 +113,7 @@ const StoryView = ({ storyId }) => {
                 acceptanceCriteria: formData.acceptanceCriteria
             };
 
-            generateVersionChangeDescription(oldVersion, newVersionForAI, settings).then(result => {
-                if (result) {
-                    updateVersion(storyId, newVersionId, {
-                        changeTitle: result.changeTitle,
-                        changeDescription: result.changeDescription
-                    });
-                }
-            });
+            triggerVersionTitleGeneration(storyId, newVersionId, oldVersion, newVersionForAI);
         }
     };
 
@@ -239,14 +232,7 @@ const StoryView = ({ storyId }) => {
         setActiveTab('edit');
 
         if (oldVersion && newVersionId) {
-            generateVersionChangeDescription(oldVersion, aiSuggestion, settings).then(result => {
-                if (result) {
-                    updateVersion(storyId, newVersionId, {
-                        changeTitle: result.changeTitle,
-                        changeDescription: result.changeDescription
-                    });
-                }
-            });
+            triggerVersionTitleGeneration(storyId, newVersionId, oldVersion, aiSuggestion);
         }
     };
 

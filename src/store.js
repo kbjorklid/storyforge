@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { storage } from './storage';
 import { v4 as uuidv4 } from 'uuid';
+import { generateVersionChangeDescription } from './services/ai';
 
 const createProjectSlice = (set, get) => ({
     projects: [],
@@ -42,6 +43,20 @@ const createContentSlice = (set) => ({
     folders: {}, // Record<string, Folder>
     stories: {}, // Record<string, Story>
     drafts: {}, // Record<string, { content: StoryContent, timestamp: string, baseVersionId: string }>
+
+    triggerVersionTitleGeneration: (storyId, versionId, oldVersion, newVersion) => {
+        const settings = get().settings;
+        if (!settings.openRouterKey) return;
+
+        generateVersionChangeDescription(oldVersion, newVersion, settings).then(result => {
+            if (result) {
+                get().updateVersion(storyId, versionId, {
+                    changeTitle: result.changeTitle,
+                    changeDescription: result.changeDescription
+                });
+            }
+        });
+    },
 
     saveDraft: (storyId, content, baseVersionId) => set((state) => ({
         drafts: {

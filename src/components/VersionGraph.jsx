@@ -65,31 +65,36 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect,
 
         const zoom = d3.zoom()
             .scaleExtent([0.1, 4])
+            .on("start", () => svg.style("cursor", "grabbing"))
             .on("zoom", (event) => {
                 g.attr("transform", event.transform);
-            });
+            })
+            .on("end", () => svg.style("cursor", "grab"));
 
-        svg.call(zoom);
+        svg.call(zoom)
+            .style("cursor", "grab");
 
-        // Center the tree initially
-        // Find bounds
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        root.descendants().forEach(d => {
-            minX = Math.min(minX, d.y);
-            maxX = Math.max(maxX, d.y);
-            minY = Math.min(minY, d.x);
-            maxY = Math.max(maxY, d.x);
-        });
+        // Center the tree initially or focus on target
+        // Find target node to focus on (Draft -> Current -> Latest)
+        let targetNode = root.descendants().find(d => d.data.id === 'draft');
+        if (!targetNode) {
+            targetNode = root.descendants().find(d => d.data.id === currentVersionId);
+        }
+        if (!targetNode && root.descendants().length > 0) {
+            // Fallback to the last node (usually latest in time)
+            const descendants = root.descendants();
+            targetNode = descendants[descendants.length - 1];
+        }
 
-        // const treeWidth = maxX - minX;
-        // const treeHeight = maxY - minY;
-
-        // Initial transform to center and have some padding
         const initialScale = 1;
-        const initialX = margin.left; // Start from left
-        const initialY = height / 2; // Center vertically relative to root? 
-        // Actually, d3.tree places root at (0,0) usually? No, it places it based on layout.
-        // With nodeSize, root is at (0,0).
+        let initialX = margin.left;
+        let initialY = height / 2;
+
+        if (targetNode) {
+            // Position the target node at 2/3 of the screen width to show more history
+            initialX = (width * 0.66) - (targetNode.y * initialScale);
+            initialY = (height / 2) - (targetNode.x * initialScale);
+        }
 
         svg.call(zoom.transform, d3.zoomIdentity.translate(initialX, initialY).scale(initialScale));
 
