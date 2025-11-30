@@ -167,9 +167,9 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect,
 
         // Labels
         node.append("text")
-            .attr("dy", "0.31em")
-            .attr("x", d => d.children ? -15 : 15)
-            .attr("text-anchor", d => d.children ? "end" : "start")
+            .attr("dy", "2.5em")
+            .attr("x", 0)
+            .attr("text-anchor", "middle")
             .attr("fill", "var(--color-text-primary)")
             .style("opacity", 0)
             .text(d => {
