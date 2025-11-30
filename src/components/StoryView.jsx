@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import { Sparkles, Save, GitBranch, Scissors, RotateCcw } from 'lucide-react';
+import { Sparkles, Save, GitBranch, Scissors, RotateCcw, Edit } from 'lucide-react';
 import { improveStory, generateClarifyingQuestions, splitStory } from '../services/ai';
 import ContentContainer from './ContentContainer';
 import VersionGraph from './VersionGraph';
@@ -41,6 +41,9 @@ const StoryView = ({ storyId }) => {
     const [retainOriginal, setRetainOriginal] = useState(true);
     const [splitInstructions, setSplitInstructions] = useState('');
     const [activeSplitTab, setActiveSplitTab] = useState(0); // 0 for original, 1+ for new stories
+    const [askSplitClarifyingQuestions, setAskSplitClarifyingQuestions] = useState(false);
+    const [splitClarifyingQuestions, setSplitClarifyingQuestions] = useState(null);
+    const [splitAnswers, setSplitAnswers] = useState({});
 
     useEffect(() => {
         if (story) {
@@ -252,6 +255,55 @@ const StoryView = ({ storyId }) => {
         }
     };
 
+    const handleSplitAnswerChange = (questionId, value, type) => {
+        setSplitAnswers(prev => {
+            if (type === 'multi_select') {
+                const current = prev[questionId] || [];
+                if (current.includes(value)) {
+                    return { ...prev, [questionId]: current.filter(v => v !== value) };
+                } else {
+                    return { ...prev, [questionId]: [...current, value] };
+                }
+            }
+            return { ...prev, [questionId]: value };
+        });
+    };
+
+    const handleSubmitSplitAnswers = async () => {
+        setIsSplitting(true);
+        setError(null);
+        try {
+            // Format answers for the AI
+            const qaContext = splitClarifyingQuestions.map(q => {
+                let answer = splitAnswers[q.id];
+                if (Array.isArray(answer)) {
+                    answer = answer.join(', ');
+                }
+                return {
+                    question: q.text,
+                    answer: answer || 'Skipped'
+                };
+            });
+
+            const result = await splitStory(formData, settings, {
+                context: projectContext?.context,
+                systemPrompt: projectContext?.systemPrompt
+            }, splitInstructions, qaContext);
+
+            if (result && result.length > 0) {
+                setSplitStories(result);
+                setActiveSplitTab(1);
+                setSplitClarifyingQuestions(null);
+            } else {
+                throw new Error("AI returned no stories. Please try again.");
+            }
+        } catch (err) {
+            setError('Failed to split story: ' + err.message);
+        } finally {
+            setIsSplitting(false);
+        }
+    };
+
     const handleSplit = async () => {
         if (!settings.openRouterKey) {
             setError('Please add your OpenRouter API Key in Settings first.');
@@ -265,18 +317,44 @@ const StoryView = ({ storyId }) => {
         setIsSplitting(true);
         setError(null);
         setSplitStories(null);
+        setSplitClarifyingQuestions(null);
+        setSplitAnswers({});
 
         try {
-            const result = await splitStory(formData, settings, {
-                context: projectContext?.context,
-                systemPrompt: projectContext?.systemPrompt
-            });
+            if (askSplitClarifyingQuestions) {
+                const questions = await generateClarifyingQuestions(formData, settings, {
+                    context: projectContext?.context,
+                    systemPrompt: projectContext?.systemPrompt
+                }, 'split');
 
-            if (result && result.length > 0) {
-                setSplitStories(result);
-                setActiveSplitTab(1); // Switch to first split story
+                if (questions && questions.length > 0) {
+                    setSplitClarifyingQuestions(questions);
+                } else {
+                    // If no questions generated, proceed directly to split
+                    const result = await splitStory(formData, settings, {
+                        context: projectContext?.context,
+                        systemPrompt: projectContext?.systemPrompt
+                    }, splitInstructions);
+
+                    if (result && result.length > 0) {
+                        setSplitStories(result);
+                        setActiveSplitTab(1); // Switch to first split story
+                    } else {
+                        throw new Error("AI returned no stories. Please try again.");
+                    }
+                }
             } else {
-                throw new Error("AI returned no stories. Please try again.");
+                const result = await splitStory(formData, settings, {
+                    context: projectContext?.context,
+                    systemPrompt: projectContext?.systemPrompt
+                }, splitInstructions);
+
+                if (result && result.length > 0) {
+                    setSplitStories(result);
+                    setActiveSplitTab(1); // Switch to first split story
+                } else {
+                    throw new Error("AI returned no stories. Please try again.");
+                }
             }
         } catch (err) {
             setError('Failed to split story: ' + err.message);
@@ -360,10 +438,13 @@ const StoryView = ({ storyId }) => {
                         color: activeTab === 'edit' ? 'var(--color-text)' : 'var(--color-text-muted)',
                         fontWeight: activeTab === 'edit' ? '600' : '400',
                         background: 'none',
-                        borderRadius: 0
+                        borderRadius: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
                     }}
                 >
-                    Edit Story
+                    <Edit size={16} /> Edit Story
                 </button>
                 <button
                     onClick={() => setActiveTab('rewrite')}
@@ -382,22 +463,6 @@ const StoryView = ({ storyId }) => {
                     <Sparkles size={16} /> Rewrite Story
                 </button>
                 <button
-                    onClick={() => setActiveTab('versions')}
-                    style={{
-                        padding: '0.75rem 1.5rem',
-                        borderBottom: activeTab === 'versions' ? '2px solid var(--color-accent)' : 'none',
-                        color: activeTab === 'versions' ? 'var(--color-text)' : 'var(--color-text-muted)',
-                        fontWeight: activeTab === 'versions' ? '600' : '400',
-                        background: 'none',
-                        borderRadius: 0,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem'
-                    }}
-                >
-                    <GitBranch size={16} /> Versions
-                </button>
-                <button
                     onClick={() => setActiveTab('split')}
                     style={{
                         padding: '0.75rem 1.5rem',
@@ -412,6 +477,22 @@ const StoryView = ({ storyId }) => {
                     }}
                 >
                     <Scissors size={16} /> Split Story
+                </button>
+                <button
+                    onClick={() => setActiveTab('versions')}
+                    style={{
+                        padding: '0.75rem 1.5rem',
+                        borderBottom: activeTab === 'versions' ? '2px solid var(--color-accent)' : 'none',
+                        color: activeTab === 'versions' ? 'var(--color-text)' : 'var(--color-text-muted)',
+                        fontWeight: activeTab === 'versions' ? '600' : '400',
+                        background: 'none',
+                        borderRadius: 0,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem'
+                    }}
+                >
+                    <GitBranch size={16} /> Versions
                 </button>
             </div>
 
@@ -662,12 +743,26 @@ const StoryView = ({ storyId }) => {
                 </div>
             ) : activeTab === 'split' ? (
                 <div className="split-column" style={{ minHeight: '400px', display: 'flex', flexDirection: 'column' }}>
-                    {!splitStories && !isSplitting ? (
+                    {!splitStories && !isSplitting && !splitClarifyingQuestions ? (
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', opacity: 0.8 }}>
                             <Scissors size={48} color="var(--color-accent)" />
                             <p style={{ fontSize: '1.1rem', textAlign: 'center', maxWidth: '400px' }}>
                                 Use AI to split this story into multiple smaller, independent stories.
                             </p>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
+                                <input
+                                    type="checkbox"
+                                    id="askSplitClarifyingQuestions"
+                                    checked={askSplitClarifyingQuestions}
+                                    onChange={(e) => setAskSplitClarifyingQuestions(e.target.checked)}
+                                    style={{ width: '1.2rem', height: '1.2rem' }}
+                                />
+                                <label htmlFor="askSplitClarifyingQuestions" style={{ fontSize: '1.1rem', cursor: 'pointer' }}>
+                                    Ask clarifying questions
+                                </label>
+                            </div>
+
                             {unsavedStories[storyId] && (
                                 <p style={{ color: 'var(--color-warning)', marginBottom: '1rem', fontStyle: 'italic' }}>
                                     Note: Proceeding will save your current changes.
@@ -685,7 +780,67 @@ const StoryView = ({ storyId }) => {
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
                             <div className="spinner" style={{ width: '40px', height: '40px', border: '4px solid var(--color-bg-secondary)', borderTop: '4px solid var(--color-accent)', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
                             <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-                            <p style={{ fontSize: '1.1rem' }}>Splitting story...</p>
+                            <p style={{ fontSize: '1.1rem' }}>{splitClarifyingQuestions ? 'Generating split stories...' : 'Splitting story...'}</p>
+                        </div>
+                    ) : splitClarifyingQuestions ? (
+                        <div className="questions-column" style={{ border: '1px solid var(--color-accent)', borderRadius: '8px', padding: '1.5rem', backgroundColor: 'var(--color-bg-secondary)' }}>
+                            <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                <Sparkles size={20} /> Clarifying Questions
+                            </h3>
+                            <p style={{ marginBottom: '1.5rem' }}>Please answer the following questions to help the AI split your story effectively.</p>
+
+                            {splitClarifyingQuestions.map((q, index) => (
+                                <div key={q.id || index} style={{ marginBottom: '1.5rem' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>{index + 1}. {q.text}</label>
+
+                                    {q.type === 'text' && (
+                                        <textarea
+                                            value={splitAnswers[q.id] || ''}
+                                            onChange={(e) => handleSplitAnswerChange(q.id, e.target.value, 'text')}
+                                            rows={3}
+                                            style={{ width: '100%', resize: 'vertical' }}
+                                        />
+                                    )}
+
+                                    {q.type === 'single_select' && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            {q.options?.map((option, i) => (
+                                                <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                    <input
+                                                        type="radio"
+                                                        name={`question-${q.id}`}
+                                                        value={option}
+                                                        checked={splitAnswers[q.id] === option}
+                                                        onChange={(e) => handleSplitAnswerChange(q.id, e.target.value, 'single_select')}
+                                                    />
+                                                    {option}
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {q.type === 'multi_select' && (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                            {q.options?.map((option, i) => (
+                                                <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                    <input
+                                                        type="checkbox"
+                                                        value={option}
+                                                        checked={(splitAnswers[q.id] || []).includes(option)}
+                                                        onChange={() => handleSplitAnswerChange(q.id, option, 'multi_select')}
+                                                    />
+                                                    {option}
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+
+                            <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'flex-end' }}>
+                                <button onClick={() => setSplitClarifyingQuestions(null)} style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', padding: '0.75rem 1.5rem' }}>Cancel</button>
+                                <button onClick={handleSubmitSplitAnswers} style={{ backgroundColor: 'var(--color-accent)', color: 'white', padding: '0.75rem 1.5rem' }}>Submit Answers & Split</button>
+                            </div>
                         </div>
                     ) : (
                         <div className="split-results" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>

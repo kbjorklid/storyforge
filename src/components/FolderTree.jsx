@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import { Folder, FileText, ChevronRight, ChevronDown, Plus, Trash2, MoreVertical, Edit2 } from 'lucide-react';
+import { Folder, FileText, ChevronRight, ChevronDown, Plus, Trash2, MoreVertical, Edit2, Copy } from 'lucide-react';
 import Menu from './Menu';
 
 const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searchTerm = '' }) => {
-    const { folders, stories, addFolder, addStory, deleteStory, moveStory, moveFolder, unsavedStories, deleteFolder, updateFolder, drafts } = useStore();
+    const { folders, stories, addFolder, addStory, deleteStory, moveStory, moveFolder, unsavedStories, deleteFolder, updateFolder, drafts, duplicateStory } = useStore();
     const folder = folders[folderId];
     const [isOpen, setIsOpen] = useState(true);
     const [isAdding, setIsAdding] = useState(null); // 'folder' or 'story'
@@ -109,16 +109,18 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
         }
     };
 
-    const handleMenuOpen = (e) => {
+    const handleMenuOpen = (e, id, type) => {
         e.stopPropagation();
         e.preventDefault();
         const rect = e.currentTarget.getBoundingClientRect();
         setActiveMenu({
+            id,
+            type,
             position: { x: rect.right + 5, y: rect.top }
         });
     };
 
-    const handleMenuAction = (action) => {
+    const handleMenuAction = (action, id) => {
         switch (action) {
             case 'new-folder':
                 setIsAdding('folder');
@@ -140,7 +142,16 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
                     deleteFolder(folderId);
                 }
                 break;
+            case 'delete-story':
+                if (confirm('Are you sure you want to delete this story?')) {
+                    deleteStory(id);
+                }
+                break;
+            case 'duplicate-story':
+                duplicateStory(id);
+                break;
         }
+        setActiveMenu(null);
     };
 
     return (
@@ -177,7 +188,7 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
                 <span style={{ fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folder.name}</span>
 
                 <button
-                    onClick={handleMenuOpen}
+                    onClick={(e) => handleMenuOpen(e, folderId, 'folder')}
                     style={{
                         padding: '0.1rem',
                         backgroundColor: 'transparent',
@@ -193,7 +204,7 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
                     <MoreVertical size={14} />
                 </button>
 
-                {activeMenu && (
+                {activeMenu && activeMenu.id === folderId && activeMenu.type === 'folder' && (
                     <Menu
                         isOpen={true}
                         onClose={() => setActiveMenu(null)}
@@ -283,23 +294,32 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
                                     )}
                                 </div>
                                 <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        deleteStory(storyId);
-                                    }}
-                                    className="delete-btn"
+                                    onClick={(e) => handleMenuOpen(e, storyId, 'story')}
+                                    className="story-actions"
                                     style={{
                                         padding: '0.1rem',
                                         background: 'transparent',
                                         border: 'none',
                                         color: 'var(--color-text-secondary)',
                                         opacity: 0.6,
-                                        cursor: 'pointer'
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        alignItems: 'center'
                                     }}
-                                    title="Delete Story"
                                 >
-                                    <Trash2 size={12} />
+                                    <MoreVertical size={12} />
                                 </button>
+                                {activeMenu && activeMenu.id === storyId && activeMenu.type === 'story' && (
+                                    <Menu
+                                        isOpen={true}
+                                        onClose={() => setActiveMenu(null)}
+                                        position={activeMenu.position}
+                                        items={[
+                                            { label: 'Duplicate Story', icon: <Copy size={14} />, onClick: () => handleMenuAction('duplicate-story', storyId) },
+                                            { label: 'Delete Story', icon: <Trash2 size={14} />, onClick: () => handleMenuAction('delete-story', storyId), danger: true },
+                                        ]}
+                                    />
+                                )}
                             </div>
                         );
                     })}
@@ -310,8 +330,34 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
 };
 
 const FolderTree = ({ rootFolderId, onSelectStory, selectedStoryId, searchTerm }) => {
-    const { folders, stories, deleteStory, unsavedStories, drafts } = useStore();
+    const { folders, stories, deleteStory, unsavedStories, drafts, duplicateStory } = useStore();
     const rootFolder = folders[rootFolderId];
+    const [activeMenu, setActiveMenu] = useState(null);
+
+    const handleMenuOpen = (e, id, type) => {
+        e.stopPropagation();
+        e.preventDefault();
+        const rect = e.currentTarget.getBoundingClientRect();
+        setActiveMenu({
+            id,
+            type,
+            position: { x: rect.right + 5, y: rect.top }
+        });
+    };
+
+    const handleMenuAction = (action, id) => {
+        switch (action) {
+            case 'delete-story':
+                if (confirm('Are you sure you want to delete this story?')) {
+                    deleteStory(id);
+                }
+                break;
+            case 'duplicate-story':
+                duplicateStory(id);
+                break;
+        }
+        setActiveMenu(null);
+    };
 
     if (!rootFolder) return null;
 
@@ -375,23 +421,32 @@ const FolderTree = ({ rootFolderId, onSelectStory, selectedStoryId, searchTerm }
                             )}
                         </div>
                         <button
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                deleteStory(storyId);
-                            }}
-                            className="delete-btn"
+                            onClick={(e) => handleMenuOpen(e, storyId, 'story')}
+                            className="story-actions"
                             style={{
                                 padding: '0.1rem',
                                 background: 'transparent',
                                 border: 'none',
                                 color: 'var(--color-text-secondary)',
                                 opacity: 0.6,
-                                cursor: 'pointer'
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center'
                             }}
-                            title="Delete Story"
                         >
-                            <Trash2 size={12} />
+                            <MoreVertical size={12} />
                         </button>
+                        {activeMenu && activeMenu.id === storyId && activeMenu.type === 'story' && (
+                            <Menu
+                                isOpen={true}
+                                onClose={() => setActiveMenu(null)}
+                                position={activeMenu.position}
+                                items={[
+                                    { label: 'Duplicate Story', icon: <Copy size={14} />, onClick: () => handleMenuAction('duplicate-story', storyId) },
+                                    { label: 'Delete Story', icon: <Trash2 size={14} />, onClick: () => handleMenuAction('delete-story', storyId), danger: true },
+                                ]}
+                            />
+                        )}
                     </div>
                 );
             })}

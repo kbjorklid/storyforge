@@ -459,6 +459,50 @@ const createContentSlice = (set) => ({
         }
         return newState;
     }),
+
+    duplicateStory: (storyId) => set((state) => {
+        const originalStory = state.stories[storyId];
+        if (!originalStory) return state;
+
+        const newStoryId = uuidv4();
+        const initialVersionId = uuidv4();
+        const timestamp = new Date().toISOString();
+
+        const initialVersion = {
+            id: initialVersionId,
+            parentId: null,
+            timestamp,
+            title: `${originalStory.title} (duplicate)`,
+            description: originalStory.description,
+            acceptanceCriteria: originalStory.acceptanceCriteria,
+            author: 'user'
+        };
+
+        const newStory = {
+            id: newStoryId,
+            parentId: originalStory.parentId,
+            title: `${originalStory.title} (duplicate)`,
+            description: originalStory.description,
+            acceptanceCriteria: originalStory.acceptanceCriteria,
+            createdAt: timestamp,
+            versions: { [initialVersionId]: initialVersion },
+            currentVersionId: initialVersionId,
+        };
+
+        const newState = {
+            stories: { ...state.stories, [newStoryId]: newStory },
+            folders: { ...state.folders }
+        };
+
+        if (originalStory.parentId && state.folders[originalStory.parentId]) {
+            newState.folders[originalStory.parentId] = {
+                ...state.folders[originalStory.parentId],
+                stories: [...state.folders[originalStory.parentId].stories, newStoryId]
+            };
+        }
+
+        return newState;
+    }),
 });
 
 const createSettingsSlice = (set) => ({

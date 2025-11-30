@@ -134,7 +134,7 @@ export const improveStory = async (story, settings, projectSettings = {}, qaCont
     }
 };
 
-export const generateClarifyingQuestions = async (story, settings, projectSettings = {}) => {
+export const generateClarifyingQuestions = async (story, settings, projectSettings = {}, type = 'improve') => {
     const { openRouterKey, largeModel } = settings;
     const { context, systemPrompt } = projectSettings;
 
@@ -142,7 +142,44 @@ export const generateClarifyingQuestions = async (story, settings, projectSettin
         throw new Error('OpenRouter API Key is missing');
     }
 
-    let systemInstructions = `
+    let systemInstructions = '';
+
+    if (type === 'split') {
+        systemInstructions = `
+    You are an expert Product Owner and Business Analyst.
+    Review the following user story. Your goal is to split this story into smaller, independent stories (INVEST criteria).
+    Identify what information is missing or ambiguous that prevents you from effectively splitting this story.
+    Generate 3-5 clarifying questions specifically about HOW to split the story (e.g., boundaries, distinct user flows, separate criteria, edge cases).
+    Do NOT ask general questions about the story content unless it directly affects how it should be split.
+    
+    For each question, determine the best format:
+    - "text": For open-ended questions.
+    - "single_select": For questions with mutually exclusive options (radio buttons).
+    - "multi_select": For questions where multiple options can be selected (checkboxes).
+    
+    Return the result as a JSON object where each key is a unique identifier (e.g., "question1", "question2") and the value is the question object.
+    
+    Example JSON structure:
+    \`\`\`json
+    {
+        "question1": {
+            "id": "q1",
+            "text": "Should the admin and user flows be separate stories?",
+            "type": "single_select",
+            "options": ["Yes, separate them", "No, keep them together"]
+        },
+        "question2": {
+            "id": "q2",
+            "text": "What are the specific edge cases for the payment flow?",
+            "type": "text"
+        }
+    }
+    \`\`\`
+    
+    Do not include any markdown formatting around the JSON.
+    `;
+    } else {
+        systemInstructions = `
     You are an expert Product Owner and Business Analyst.
     Review the following user story and identify ambiguities or missing details.
     Generate 3-5 clarifying questions that would help improve the story.
@@ -152,16 +189,28 @@ export const generateClarifyingQuestions = async (story, settings, projectSettin
     - "single_select": For questions with mutually exclusive options (radio buttons).
     - "multi_select": For questions where multiple options can be selected (checkboxes).
     
-    Return the result as a JSON array of objects with the following structure:
+    Return the result as a JSON object where each key is a unique identifier (e.g., "question1", "question2") and the value is the question object.
+    
+    Example JSON structure:
+    \`\`\`json
     {
-        "id": "unique_id",
-        "text": "The question text",
-        "type": "text" | "single_select" | "multi_select",
-        "options": ["Option 1", "Option 2"] // Only for select types
+        "question1": {
+            "id": "q1",
+            "text": "What is the target response time for this API?",
+            "type": "text"
+        },
+        "question2": {
+            "id": "q2",
+            "text": "Which user roles should have access?",
+            "type": "multi_select",
+            "options": ["Admin", "Editor", "Viewer"]
+        }
     }
+    \`\`\`
     
     Do not include any markdown formatting around the JSON.
     `;
+    }
 
     if (systemPrompt) {
         systemInstructions += `\n\nAdditional Instructions:\n${systemPrompt}`;
@@ -211,7 +260,7 @@ export const generateClarifyingQuestions = async (story, settings, projectSettin
             // Fallback: Check if it's an object with numeric keys or just values
             const values = Object.values(parsed);
             if (values.length > 0 && typeof values[0] === 'object') {
-                console.warn("AI returned an object instead of array, using values:", parsed);
+                // This is the expected format now (object with keys)
                 parsed = values;
             } else {
                 console.warn("AI did not return an array, attempting to extract", parsed);
@@ -290,7 +339,7 @@ export const generateVersionChangeDescription = async (oldVersion, newVersion, s
 };
 
 
-export const splitStory = async (story, settings, projectSettings = {}, userInstructions = '') => {
+export const splitStory = async (story, settings, projectSettings = {}, userInstructions = '', qaContext = null) => {
     const { openRouterKey, largeModel } = settings;
     const { context, systemPrompt } = projectSettings;
 
@@ -322,6 +371,14 @@ export const splitStory = async (story, settings, projectSettings = {}, userInst
     Title: ${story.title}
     Description: ${story.description}
     Acceptance Criteria: ${story.acceptanceCriteria}`;
+
+    if (qaContext) {
+        userPrompt += `\n\nClarifying Questions and Answers:\n`;
+        qaContext.forEach((qa, index) => {
+            userPrompt += `Q${index + 1}: ${qa.question}\nA: ${qa.answer}\n`;
+        });
+        userPrompt += `\nPlease incorporate the information from these answers when splitting the story.`;
+    }
 
     if (userInstructions) {
         userPrompt += `\n\nUser Instructions for Splitting:\n${userInstructions}`;
