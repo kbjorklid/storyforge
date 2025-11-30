@@ -31,10 +31,12 @@ const StoryView = ({ storyId }) => {
     const [error, setError] = useState(null);
     const [activeTab, setActiveTab] = useState('edit');
     const [selectedVersionId, setSelectedVersionId] = useState(null);
-    const [askClarifyingQuestions, setAskClarifyingQuestions] = useState(false);
+    const [askClarifyingQuestions, setAskClarifyingQuestions] = useState(true);
     const [clarifyingQuestions, setClarifyingQuestions] = useState(null);
 
     const [answers, setAnswers] = useState({});
+    const [ignoredQuestions, setIgnoredQuestions] = useState(new Set());
+
     const [rewriteSelection, setRewriteSelection] = useState({
         title: true,
         description: true,
@@ -47,7 +49,7 @@ const StoryView = ({ storyId }) => {
     const [retainOriginal, setRetainOriginal] = useState(true);
     const [splitInstructions, setSplitInstructions] = useState('');
     const [activeSplitTab, setActiveSplitTab] = useState(0); // 0 for original, 1+ for new stories
-    const [askSplitClarifyingQuestions, setAskSplitClarifyingQuestions] = useState(false);
+    const [askSplitClarifyingQuestions, setAskSplitClarifyingQuestions] = useState(true);
     const [splitClarifyingQuestions, setSplitClarifyingQuestions] = useState(null);
     const [splitAnswers, setSplitAnswers] = useState({});
     const [createSubfolder, setCreateSubfolder] = useState(false);
@@ -158,6 +160,8 @@ const StoryView = ({ storyId }) => {
         setError(null);
         setClarifyingQuestions(null);
         setAnswers({});
+        setIgnoredQuestions(new Set());
+
 
         try {
             if (askClarifyingQuestions) {
@@ -195,16 +199,26 @@ const StoryView = ({ storyId }) => {
         setError(null);
         try {
             // Format answers for the AI
-            const qaContext = clarifyingQuestions.map(q => {
-                let answer = answers[q.id];
-                if (Array.isArray(answer)) {
-                    answer = answer.join(', ');
-                }
-                return {
-                    question: q.text,
-                    answer: answer || 'Skipped'
-                };
-            });
+            const qaContext = clarifyingQuestions
+                .filter(q => !ignoredQuestions.has(q.id))
+                .map(q => {
+
+                    let answer = answers[q.id];
+                    if (Array.isArray(answer)) {
+                        answer = answer.join(', ');
+                    }
+                    return {
+                        question: q.text,
+                        answer: answer || 'Skipped'
+                    };
+                });
+
+            if (answers['other_notes']) {
+                qaContext.push({
+                    question: "Additional User Notes",
+                    answer: answers['other_notes']
+                });
+            }
 
             const improved = await improveStory(formData, settings, {
                 context: projectContext?.context,
@@ -219,10 +233,25 @@ const StoryView = ({ storyId }) => {
         }
     };
 
-    const handleAnswerChange = (questionId, value, type) => {
+    const handleIgnoreQuestion = (questionId) => {
+        setIgnoredQuestions(prev => {
+            const next = new Set(prev);
+            if (next.has(questionId)) {
+                next.delete(questionId);
+            } else {
+                next.add(questionId);
+            }
+            return next;
+        });
+    };
+
+    const handleAnswerChange = (questionId, value, type, oldValue = null) => {
         setAnswers(prev => {
             if (type === 'multi_select') {
                 const current = prev[questionId] || [];
+                if (oldValue) {
+                    return { ...prev, [questionId]: current.map(v => v === oldValue ? value : v) };
+                }
                 if (current.includes(value)) {
                     return { ...prev, [questionId]: current.filter(v => v !== value) };
                 } else {
@@ -263,10 +292,13 @@ const StoryView = ({ storyId }) => {
         }
     };
 
-    const handleSplitAnswerChange = (questionId, value, type) => {
+    const handleSplitAnswerChange = (questionId, value, type, oldValue = null) => {
         setSplitAnswers(prev => {
             if (type === 'multi_select') {
                 const current = prev[questionId] || [];
+                if (oldValue) {
+                    return { ...prev, [questionId]: current.map(v => v === oldValue ? value : v) };
+                }
                 if (current.includes(value)) {
                     return { ...prev, [questionId]: current.filter(v => v !== value) };
                 } else {
@@ -282,16 +314,26 @@ const StoryView = ({ storyId }) => {
         setError(null);
         try {
             // Format answers for the AI
-            const qaContext = splitClarifyingQuestions.map(q => {
-                let answer = splitAnswers[q.id];
-                if (Array.isArray(answer)) {
-                    answer = answer.join(', ');
-                }
-                return {
-                    question: q.text,
-                    answer: answer || 'Skipped'
-                };
-            });
+            const qaContext = splitClarifyingQuestions
+                .filter(q => !ignoredQuestions.has(q.id))
+                .map(q => {
+
+                    let answer = splitAnswers[q.id];
+                    if (Array.isArray(answer)) {
+                        answer = answer.join(', ');
+                    }
+                    return {
+                        question: q.text,
+                        answer: answer || 'Skipped'
+                    };
+                });
+
+            if (splitAnswers['other_notes']) {
+                qaContext.push({
+                    question: "Additional User Notes",
+                    answer: splitAnswers['other_notes']
+                });
+            }
 
             const [result, subfolderNameSuggestion] = await Promise.all([
                 splitStory(formData, settings, {
@@ -307,7 +349,7 @@ const StoryView = ({ storyId }) => {
                 setSplitClarifyingQuestions(null);
                 if (subfolderNameSuggestion) {
                     setSubfolderName(subfolderNameSuggestion);
-                    setCreateSubfolder(true);
+                    // setCreateSubfolder(true); // Don't auto-check
                 }
             } else {
                 throw new Error("AI returned no stories. Please try again.");
@@ -334,6 +376,8 @@ const StoryView = ({ storyId }) => {
         setSplitStories(null);
         setSplitClarifyingQuestions(null);
         setSplitAnswers({});
+        setIgnoredQuestions(new Set());
+
 
         try {
             if (askSplitClarifyingQuestions) {
@@ -512,6 +556,8 @@ const StoryView = ({ storyId }) => {
                         applySuggestion={applySuggestion}
                         rejectSuggestion={rejectSuggestion}
                         setClarifyingQuestions={setClarifyingQuestions}
+                        ignoredQuestions={ignoredQuestions}
+                        handleIgnoreQuestion={handleIgnoreQuestion}
                     />
                 )}
 
@@ -540,6 +586,11 @@ const StoryView = ({ storyId }) => {
                         setSubfolderName={setSubfolderName}
                         activeSplitTab={activeSplitTab}
                         setActiveSplitTab={setActiveSplitTab}
+                        handleReSplit={handleReSplit}
+                        ignoredQuestions={ignoredQuestions}
+                        handleIgnoreQuestion={handleIgnoreQuestion}
+                        retainOriginal={retainOriginal}
+                        setRetainOriginal={setRetainOriginal}
                     />
                 )}
 

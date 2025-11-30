@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, EyeOff, Eye } from 'lucide-react';
 import LoadingAnimation from '../LoadingAnimation';
 
 const RewriteTab = ({
@@ -20,7 +20,9 @@ const RewriteTab = ({
     handleAnswerChange,
     applySuggestion,
     rejectSuggestion,
-    setClarifyingQuestions
+    setClarifyingQuestions,
+    ignoredQuestions,
+    handleIgnoreQuestion
 }) => {
     return (
         <motion.div
@@ -69,15 +71,35 @@ const RewriteTab = ({
                         </label>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                        <input
-                            type="checkbox"
-                            id="askClarifyingQuestions"
-                            checked={askClarifyingQuestions}
-                            onChange={(e) => setAskClarifyingQuestions(e.target.checked)}
-                            style={{ width: '1.2rem', height: '1.2rem' }}
-                        />
-                        <label htmlFor="askClarifyingQuestions" style={{ fontSize: '1.1rem', cursor: 'pointer' }}>
+                    <div
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', cursor: 'pointer' }}
+                        onClick={() => setAskClarifyingQuestions(!askClarifyingQuestions)}
+                    >
+                        <div style={{
+                            width: '44px',
+                            height: '24px',
+                            backgroundColor: askClarifyingQuestions ? 'var(--color-accent)' : 'var(--color-border)',
+                            borderRadius: '12px',
+                            position: 'relative',
+                            transition: 'background-color 0.2s',
+                            flexShrink: 0
+                        }}>
+                            <motion.div
+                                initial={false}
+                                animate={{ x: askClarifyingQuestions ? 22 : 2 }}
+                                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                style={{
+                                    width: '20px',
+                                    height: '20px',
+                                    backgroundColor: 'white',
+                                    borderRadius: '50%',
+                                    position: 'absolute',
+                                    top: '2px',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                                }}
+                            />
+                        </div>
+                        <label style={{ fontSize: '1.1rem', cursor: 'pointer', userSelect: 'none' }}>
                             Ask clarifying questions
                         </label>
                     </div>
@@ -86,18 +108,38 @@ const RewriteTab = ({
                             Note: Proceeding will save your current changes.
                         </p>
                     )}
+
+                    {(!rewriteSelection.title && !rewriteSelection.description && !rewriteSelection.acceptanceCriteria) && (
+                        <p style={{ color: 'var(--color-danger)', marginBottom: '1rem', fontSize: '0.9rem' }}>
+                            Please select at least one part of the story to rewrite.
+                        </p>
+                    )}
+
                     <motion.button
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
                         onClick={handleImprove}
-                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', backgroundColor: 'var(--color-accent)', fontSize: '1.1rem', padding: '0.75rem 1.5rem', border: 'none', color: 'white', borderRadius: '8px' }}
+                        disabled={!rewriteSelection.title && !rewriteSelection.description && !rewriteSelection.acceptanceCriteria}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            backgroundColor: (!rewriteSelection.title && !rewriteSelection.description && !rewriteSelection.acceptanceCriteria) ? 'var(--color-text-tertiary)' : 'var(--color-accent)',
+                            fontSize: '1.1rem',
+                            padding: '0.75rem 1.5rem',
+                            border: 'none',
+                            color: 'white',
+                            borderRadius: '8px',
+                            cursor: (!rewriteSelection.title && !rewriteSelection.description && !rewriteSelection.acceptanceCriteria) ? 'not-allowed' : 'pointer',
+                            opacity: (!rewriteSelection.title && !rewriteSelection.description && !rewriteSelection.acceptanceCriteria) ? 0.7 : 1
+                        }}
                     >
                         <Sparkles size={20} />
                         Improve with AI
                     </motion.button>
                 </div>
             ) : isImproving ? (
-                <LoadingAnimation text={clarifyingQuestions ? 'Generating rewrite...' : 'Processing...'} />
+                <LoadingAnimation />
             ) : clarifyingQuestions ? (
                 <div className="questions-column" style={{ border: '1px solid var(--color-accent)', borderRadius: '8px', padding: '1.5rem', backgroundColor: 'var(--color-bg-secondary)' }}>
                     <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -105,53 +147,146 @@ const RewriteTab = ({
                     </h3>
                     <p style={{ marginBottom: '1.5rem' }}>Please answer the following questions to help the AI improve your story.</p>
 
-                    {clarifyingQuestions.map((q, index) => (
-                        <div key={q.id || index} style={{ marginBottom: '1.5rem' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>{index + 1}. {q.text}</label>
-
-                            {q.type === 'text' && (
-                                <textarea
-                                    value={answers[q.id] || ''}
-                                    onChange={(e) => handleAnswerChange(q.id, e.target.value, 'text')}
-                                    rows={3}
-                                    style={{ width: '100%', resize: 'vertical' }}
-                                />
-                            )}
-
-                            {q.type === 'single_select' && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                    {q.options?.map((option, i) => (
-                                        <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                            <input
-                                                type="radio"
-                                                name={`question-${q.id}`}
-                                                value={option}
-                                                checked={answers[q.id] === option}
-                                                onChange={(e) => handleAnswerChange(q.id, e.target.value, 'single_select')}
-                                            />
-                                            {option}
-                                        </label>
-                                    ))}
+                    {clarifyingQuestions.map((q, index) => {
+                        const isIgnored = ignoredQuestions?.has(q.id);
+                        return (
+                            <div key={q.id || index} style={{ marginBottom: '1.5rem', opacity: isIgnored ? 0.5 : 1, transition: 'opacity 0.2s' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                                    <label style={{ display: 'block', fontWeight: '600', textDecoration: isIgnored ? 'line-through' : 'none' }}>{index + 1}. {q.text}</label>
+                                    <button
+                                        onClick={() => handleIgnoreQuestion(q.id)}
+                                        title={isIgnored ? "Include question" : "Ignore question"}
+                                        style={{
+                                            background: isIgnored ? 'var(--color-bg-primary)' : 'transparent',
+                                            border: '1px solid var(--color-border)',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            color: isIgnored ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                                            padding: '4px 8px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            fontSize: '0.85rem',
+                                            marginLeft: '1rem',
+                                            flexShrink: 0,
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        {isIgnored ? <Eye size={16} /> : <EyeOff size={16} />}
+                                        <span>{isIgnored ? "Include" : "Ignore"}</span>
+                                    </button>
                                 </div>
-                            )}
 
-                            {q.type === 'multi_select' && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                    {q.options?.map((option, i) => (
-                                        <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                            <input
-                                                type="checkbox"
-                                                value={option}
-                                                checked={(answers[q.id] || []).includes(option)}
-                                                onChange={() => handleAnswerChange(q.id, option, 'multi_select')}
-                                            />
-                                            {option}
-                                        </label>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    ))}
+                                {q.type === 'text' && (
+                                    <textarea
+                                        value={answers[q.id] || ''}
+                                        onChange={(e) => handleAnswerChange(q.id, e.target.value, 'text')}
+                                        rows={3}
+                                        style={{ width: '100%', resize: 'vertical' }}
+                                        disabled={isIgnored}
+                                    />
+                                )}
+
+                                {q.type === 'single_select' && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                        {q.options?.map((option, i) => {
+                                            const isOther = option === 'Other';
+                                            const isSelected = answers[q.id] === option || (isOther && answers[q.id]?.startsWith('Other'));
+
+                                            return (
+                                                <div key={i}>
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="radio"
+                                                            name={`question-${q.id}`}
+                                                            value={option}
+                                                            checked={isSelected}
+                                                            onChange={(e) => handleAnswerChange(q.id, option, 'single_select')}
+                                                            disabled={isIgnored}
+                                                        />
+                                                        {option}
+                                                    </label>
+                                                    {isOther && isSelected && (
+                                                        <div style={{ marginLeft: '1.7rem', marginTop: '0.5rem' }}>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Please specify..."
+                                                                value={answers[q.id]?.startsWith('Other: ') ? answers[q.id].substring(7) : ''}
+                                                                onChange={(e) => handleAnswerChange(q.id, `Other: ${e.target.value}`, 'single_select')}
+                                                                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-border)' }}
+                                                                autoFocus
+                                                                disabled={isIgnored}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {q.type === 'multi_select' && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                        {q.options?.map((option, i) => {
+                                            const isOther = option === 'Other';
+                                            const currentAnswers = answers[q.id] || [];
+                                            const isSelected = currentAnswers.some(val => val === option || (isOther && val.startsWith('Other')));
+
+                                            return (
+                                                <div key={i}>
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            value={option}
+                                                            checked={isSelected}
+                                                            onChange={() => {
+                                                                if (isOther && isSelected) {
+                                                                    const valueToRemove = currentAnswers.find(v => v.startsWith('Other'));
+                                                                    handleAnswerChange(q.id, valueToRemove, 'multi_select');
+                                                                } else {
+                                                                    handleAnswerChange(q.id, option, 'multi_select');
+                                                                }
+                                                            }}
+                                                            disabled={isIgnored}
+                                                        />
+                                                        {option}
+                                                    </label>
+                                                    {isOther && isSelected && (
+                                                        <div style={{ marginLeft: '1.7rem', marginTop: '0.5rem' }}>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Please specify..."
+                                                                value={currentAnswers.find(v => v.startsWith('Other: '))?.substring(7) || ''}
+                                                                onChange={(e) => {
+                                                                    const newValue = `Other: ${e.target.value}`;
+                                                                    const oldValue = currentAnswers.find(v => v.startsWith('Other'));
+                                                                    handleAnswerChange(q.id, newValue, 'multi_select', oldValue);
+                                                                }}
+                                                                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-border)' }}
+                                                                autoFocus
+                                                                disabled={isIgnored}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Other Notes (Optional)</label>
+                        <textarea
+                            value={answers['other_notes'] || ''}
+                            onChange={(e) => handleAnswerChange('other_notes', e.target.value, 'text')}
+                            placeholder="Any other details or corrections..."
+                            rows={3}
+                            style={{ width: '100%', resize: 'vertical' }}
+                        />
+                    </div>
 
                     <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'flex-end' }}>
                         <button onClick={() => setClarifyingQuestions(null)} style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', padding: '0.75rem 1.5rem' }}>Cancel</button>
@@ -191,7 +326,7 @@ const RewriteTab = ({
                     </div>
                 </div>
             )}
-        </motion.div>
+        </motion.div >
     );
 };
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Scissors, Sparkles } from 'lucide-react';
+import { Scissors, Sparkles, EyeOff, Eye } from 'lucide-react';
 import LoadingAnimation from '../LoadingAnimation';
 
 const SplitTab = ({
@@ -26,7 +26,12 @@ const SplitTab = ({
     subfolderName,
     setSubfolderName,
     activeSplitTab,
-    setActiveSplitTab
+    setActiveSplitTab,
+    handleReSplit,
+    ignoredQuestions,
+    handleIgnoreQuestion,
+    retainOriginal,
+    setRetainOriginal
 }) => {
     return (
         <motion.div
@@ -45,15 +50,35 @@ const SplitTab = ({
                         Use AI to split this story into multiple smaller, independent stories.
                     </p>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
-                        <input
-                            type="checkbox"
-                            id="askSplitClarifyingQuestions"
-                            checked={askSplitClarifyingQuestions}
-                            onChange={(e) => setAskSplitClarifyingQuestions(e.target.checked)}
-                            style={{ width: '1.2rem', height: '1.2rem' }}
-                        />
-                        <label htmlFor="askSplitClarifyingQuestions" style={{ fontSize: '1.1rem', cursor: 'pointer' }}>
+                    <div
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', cursor: 'pointer' }}
+                        onClick={() => setAskSplitClarifyingQuestions(!askSplitClarifyingQuestions)}
+                    >
+                        <div style={{
+                            width: '44px',
+                            height: '24px',
+                            backgroundColor: askSplitClarifyingQuestions ? 'var(--color-accent)' : 'var(--color-border)',
+                            borderRadius: '12px',
+                            position: 'relative',
+                            transition: 'background-color 0.2s',
+                            flexShrink: 0
+                        }}>
+                            <motion.div
+                                initial={false}
+                                animate={{ x: askSplitClarifyingQuestions ? 22 : 2 }}
+                                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                                style={{
+                                    width: '20px',
+                                    height: '20px',
+                                    backgroundColor: 'white',
+                                    borderRadius: '50%',
+                                    position: 'absolute',
+                                    top: '2px',
+                                    boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+                                }}
+                            />
+                        </div>
+                        <label style={{ fontSize: '1.1rem', cursor: 'pointer', userSelect: 'none' }}>
                             Ask clarifying questions
                         </label>
                     </div>
@@ -85,8 +110,10 @@ const SplitTab = ({
                         </div>
                     </div>
 
-                    <div style={{ padding: '1rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '8px', border: '1px solid var(--color-border)', flexShrink: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: createSubfolder ? '1rem' : 0 }}>
+
+
+                    <div style={{ padding: '1rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '8px', border: '1px solid var(--color-border)', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                             <input
                                 type="checkbox"
                                 id="createSubfolder"
@@ -104,6 +131,7 @@ const SplitTab = ({
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: 'auto' }}
                                 exit={{ opacity: 0, height: 0 }}
+                                style={{ marginLeft: '1.6rem' }}
                             >
                                 <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: '500' }}>Subfolder Name</label>
                                 <input
@@ -115,6 +143,19 @@ const SplitTab = ({
                                 />
                             </motion.div>
                         )}
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <input
+                                type="checkbox"
+                                id="retainOriginal"
+                                checked={retainOriginal}
+                                onChange={(e) => setRetainOriginal(e.target.checked)}
+                                style={{ width: '1.1rem', height: '1.1rem' }}
+                            />
+                            <label htmlFor="retainOriginal" style={{ fontSize: '1rem', cursor: 'pointer', userSelect: 'none' }}>
+                                Preserve original story
+                            </label>
+                        </div>
                     </div>
 
                     <div style={{ display: 'flex', gap: '1rem', flex: 1, minHeight: 0, overflow: 'hidden' }}>
@@ -228,9 +269,30 @@ const SplitTab = ({
                             )}
                         </div>
                     </div>
+
+                    <div style={{ padding: '1rem', backgroundColor: 'var(--color-bg-secondary)', borderRadius: '8px', border: '1px solid var(--color-border)', flexShrink: 0, marginTop: 'auto' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: '500' }}>Refine Split Instructions (Optional)</label>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <input
+                                type="text"
+                                value={splitInstructions}
+                                onChange={(e) => setSplitInstructions(e.target.value)}
+                                placeholder="e.g. Split into 3 parts, focus on frontend vs backend..."
+                                style={{ flex: 1, padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-border)' }}
+                            />
+                            <motion.button
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={handleReSplit}
+                                style={{ backgroundColor: 'var(--color-accent)', color: 'white', padding: '0.5rem 1rem', border: 'none', borderRadius: '4px', whiteSpace: 'nowrap' }}
+                            >
+                                Re-Split
+                            </motion.button>
+                        </div>
+                    </div>
                 </div>
             ) : isSplitting ? (
-                <LoadingAnimation text={splitClarifyingQuestions ? 'Generating split stories...' : 'Splitting story...'} />
+                <LoadingAnimation />
             ) : splitClarifyingQuestions ? (
                 <div className="questions-column" style={{ border: '1px solid var(--color-accent)', borderRadius: '8px', padding: '1.5rem', backgroundColor: 'var(--color-bg-secondary)' }}>
                     <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -238,53 +300,146 @@ const SplitTab = ({
                     </h3>
                     <p style={{ marginBottom: '1.5rem' }}>Please answer the following questions to help the AI split your story effectively.</p>
 
-                    {splitClarifyingQuestions.map((q, index) => (
-                        <div key={q.id || index} style={{ marginBottom: '1.5rem' }}>
-                            <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>{index + 1}. {q.text}</label>
-
-                            {q.type === 'text' && (
-                                <textarea
-                                    value={splitAnswers[q.id] || ''}
-                                    onChange={(e) => handleSplitAnswerChange(q.id, e.target.value, 'text')}
-                                    rows={3}
-                                    style={{ width: '100%', resize: 'vertical' }}
-                                />
-                            )}
-
-                            {q.type === 'single_select' && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                    {q.options?.map((option, i) => (
-                                        <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                            <input
-                                                type="radio"
-                                                name={`question-${q.id}`}
-                                                value={option}
-                                                checked={splitAnswers[q.id] === option}
-                                                onChange={(e) => handleSplitAnswerChange(q.id, e.target.value, 'single_select')}
-                                            />
-                                            {option}
-                                        </label>
-                                    ))}
+                    {splitClarifyingQuestions.map((q, index) => {
+                        const isIgnored = ignoredQuestions?.has(q.id);
+                        return (
+                            <div key={q.id || index} style={{ marginBottom: '1.5rem', opacity: isIgnored ? 0.5 : 1, transition: 'opacity 0.2s' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                                    <label style={{ display: 'block', fontWeight: '600', textDecoration: isIgnored ? 'line-through' : 'none' }}>{index + 1}. {q.text}</label>
+                                    <button
+                                        onClick={() => handleIgnoreQuestion(q.id)}
+                                        title={isIgnored ? "Include question" : "Ignore question"}
+                                        style={{
+                                            background: isIgnored ? 'var(--color-bg-primary)' : 'transparent',
+                                            border: '1px solid var(--color-border)',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
+                                            color: isIgnored ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
+                                            padding: '4px 8px',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: '6px',
+                                            fontSize: '0.85rem',
+                                            marginLeft: '1rem',
+                                            flexShrink: 0,
+                                            transition: 'all 0.2s'
+                                        }}
+                                    >
+                                        {isIgnored ? <Eye size={16} /> : <EyeOff size={16} />}
+                                        <span>{isIgnored ? "Include" : "Ignore"}</span>
+                                    </button>
                                 </div>
-                            )}
 
-                            {q.type === 'multi_select' && (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                    {q.options?.map((option, i) => (
-                                        <label key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-                                            <input
-                                                type="checkbox"
-                                                value={option}
-                                                checked={(splitAnswers[q.id] || []).includes(option)}
-                                                onChange={() => handleSplitAnswerChange(q.id, option, 'multi_select')}
-                                            />
-                                            {option}
-                                        </label>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    ))}
+                                {q.type === 'text' && (
+                                    <textarea
+                                        value={splitAnswers[q.id] || ''}
+                                        onChange={(e) => handleSplitAnswerChange(q.id, e.target.value, 'text')}
+                                        rows={3}
+                                        style={{ width: '100%', resize: 'vertical' }}
+                                        disabled={isIgnored}
+                                    />
+                                )}
+
+                                {q.type === 'single_select' && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                        {q.options?.map((option, i) => {
+                                            const isOther = option === 'Other';
+                                            const isSelected = splitAnswers[q.id] === option || (isOther && splitAnswers[q.id]?.startsWith('Other'));
+
+                                            return (
+                                                <div key={i}>
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="radio"
+                                                            name={`question-${q.id}`}
+                                                            value={option}
+                                                            checked={isSelected}
+                                                            onChange={(e) => handleSplitAnswerChange(q.id, option, 'single_select')}
+                                                            disabled={isIgnored}
+                                                        />
+                                                        {option}
+                                                    </label>
+                                                    {isOther && isSelected && (
+                                                        <div style={{ marginLeft: '1.7rem', marginTop: '0.5rem' }}>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Please specify..."
+                                                                value={splitAnswers[q.id]?.startsWith('Other: ') ? splitAnswers[q.id].substring(7) : ''}
+                                                                onChange={(e) => handleSplitAnswerChange(q.id, `Other: ${e.target.value}`, 'single_select')}
+                                                                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-border)' }}
+                                                                autoFocus
+                                                                disabled={isIgnored}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {q.type === 'multi_select' && (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                        {q.options?.map((option, i) => {
+                                            const isOther = option === 'Other';
+                                            const currentAnswers = splitAnswers[q.id] || [];
+                                            const isSelected = currentAnswers.some(val => val === option || (isOther && val.startsWith('Other')));
+
+                                            return (
+                                                <div key={i}>
+                                                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                                                        <input
+                                                            type="checkbox"
+                                                            value={option}
+                                                            checked={isSelected}
+                                                            onChange={() => {
+                                                                if (isOther && isSelected) {
+                                                                    const valueToRemove = currentAnswers.find(v => v.startsWith('Other'));
+                                                                    handleSplitAnswerChange(q.id, valueToRemove, 'multi_select');
+                                                                } else {
+                                                                    handleSplitAnswerChange(q.id, option, 'multi_select');
+                                                                }
+                                                            }}
+                                                            disabled={isIgnored}
+                                                        />
+                                                        {option}
+                                                    </label>
+                                                    {isOther && isSelected && (
+                                                        <div style={{ marginLeft: '1.7rem', marginTop: '0.5rem' }}>
+                                                            <input
+                                                                type="text"
+                                                                placeholder="Please specify..."
+                                                                value={currentAnswers.find(v => v.startsWith('Other: '))?.substring(7) || ''}
+                                                                onChange={(e) => {
+                                                                    const newValue = `Other: ${e.target.value}`;
+                                                                    const oldValue = currentAnswers.find(v => v.startsWith('Other'));
+                                                                    handleSplitAnswerChange(q.id, newValue, 'multi_select', oldValue);
+                                                                }}
+                                                                style={{ width: '100%', padding: '0.5rem', borderRadius: '4px', border: '1px solid var(--color-border)' }}
+                                                                autoFocus
+                                                                disabled={isIgnored}
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600' }}>Other Notes (Optional)</label>
+                        <textarea
+                            value={splitAnswers['other_notes'] || ''}
+                            onChange={(e) => handleSplitAnswerChange('other_notes', e.target.value, 'text')}
+                            placeholder="Any other details or corrections..."
+                            rows={3}
+                            style={{ width: '100%', resize: 'vertical' }}
+                        />
+                    </div>
 
                     <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem', justifyContent: 'flex-end' }}>
                         <button onClick={() => setSplitClarifyingQuestions(null)} style={{ backgroundColor: 'var(--color-bg-primary)', border: '1px solid var(--color-border)', padding: '0.75rem 1.5rem' }}>Cancel</button>

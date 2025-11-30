@@ -1,10 +1,51 @@
-export const improveStory = async (story, settings, projectSettings = {}, qaContext = null, rewriteSelection = null) => {
-    const { openRouterKey, largeModel, smallModel } = settings;
-    const { context, systemPrompt } = projectSettings;
-
+const callOpenRouter = async (openRouterKey, model, messages, responseFormat = { type: 'json_object' }) => {
     if (!openRouterKey) {
         throw new Error('OpenRouter API Key is missing');
     }
+
+    try {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${openRouterKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'http://localhost:5173',
+                'X-Title': 'StoryForge',
+            },
+            body: JSON.stringify({
+                model,
+                messages,
+                response_format: responseFormat
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error?.message || 'Failed to fetch from OpenRouter');
+        }
+
+        const data = await response.json();
+        return data.choices[0].message.content;
+    } catch (error) {
+        console.error('AI Service Error:', error);
+        throw error;
+    }
+};
+
+const ensureString = (content) => {
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) return content.join('\n\n');
+    if (typeof content === 'object' && content !== null) {
+        return Object.entries(content)
+            .map(([key, value]) => `**${key}:** ${value}`)
+            .join('\n\n');
+    }
+    return String(content || '');
+};
+
+export const improveStory = async (story, settings, projectSettings = {}, qaContext = null, rewriteSelection = null) => {
+    const { openRouterKey, largeModel, smallModel } = settings;
+    const { context, systemPrompt } = projectSettings;
 
     // Determine which model to use based on selection
     // If only title is selected, use small model. Otherwise use large/reasoning model.
@@ -69,78 +110,36 @@ export const improveStory = async (story, settings, projectSettings = {}, qaCont
         userPrompt = `Project Context:\n${context}\n\n` + userPrompt;
     }
 
-    try {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${openRouterKey}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'http://localhost:5173',
-                'X-Title': 'StoryForge',
-            },
-            body: JSON.stringify({
-                model: modelToUse,
-                messages: [
-                    { role: 'system', content: systemInstructions },
-                    { role: 'user', content: userPrompt }
-                ],
-                response_format: { type: 'json_object' }
-            })
-        });
+    const content = await callOpenRouter(openRouterKey, modelToUse, [
+        { role: 'system', content: systemInstructions },
+        { role: 'user', content: userPrompt }
+    ]);
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error?.message || 'Failed to fetch from OpenRouter');
-        }
+    let parsed = JSON.parse(content);
 
-        const data = await response.json();
-        const content = data.choices[0].message.content;
+    if (parsed.description) parsed.description = ensureString(parsed.description);
+    if (parsed.acceptanceCriteria) parsed.acceptanceCriteria = ensureString(parsed.acceptanceCriteria);
 
-        let parsed = JSON.parse(content);
+    // Merge with original story to ensure we don't lose unselected parts
+    // If rewriteSelection is provided, we only take the selected parts from the AI response
+    // and keep the rest from the original story.
+    let result = { ...story };
 
-        // Helper to ensure string content
-        const ensureString = (content) => {
-            if (typeof content === 'string') return content;
-            if (Array.isArray(content)) return content.join('\n\n');
-            if (typeof content === 'object' && content !== null) {
-                return Object.entries(content)
-                    .map(([key, value]) => `**${key}:** ${value}`)
-                    .join('\n\n');
-            }
-            return String(content || '');
-        };
-
-        if (parsed.description) parsed.description = ensureString(parsed.description);
-        if (parsed.acceptanceCriteria) parsed.acceptanceCriteria = ensureString(parsed.acceptanceCriteria);
-
-        // Merge with original story to ensure we don't lose unselected parts
-        // If rewriteSelection is provided, we only take the selected parts from the AI response
-        // and keep the rest from the original story.
-        let result = { ...story };
-
-        if (rewriteSelection) {
-            if (rewriteSelection.title && parsed.title) result.title = parsed.title;
-            if (rewriteSelection.description && parsed.description) result.description = parsed.description;
-            if (rewriteSelection.acceptanceCriteria && parsed.acceptanceCriteria) result.acceptanceCriteria = parsed.acceptanceCriteria;
-        } else {
-            // Fallback for when no selection is passed (legacy behavior), take everything
-            result = { ...result, ...parsed };
-        }
-
-        return result;
-    } catch (error) {
-        console.error('AI Service Error:', error);
-        throw error;
+    if (rewriteSelection) {
+        if (rewriteSelection.title && parsed.title) result.title = parsed.title;
+        if (rewriteSelection.description && parsed.description) result.description = parsed.description;
+        if (rewriteSelection.acceptanceCriteria && parsed.acceptanceCriteria) result.acceptanceCriteria = parsed.acceptanceCriteria;
+    } else {
+        // Fallback for when no selection is passed (legacy behavior), take everything
+        result = { ...result, ...parsed };
     }
+
+    return result;
 };
 
 export const generateClarifyingQuestions = async (story, settings, projectSettings = {}, type = 'improve') => {
     const { openRouterKey, largeModel } = settings;
     const { context, systemPrompt } = projectSettings;
-
-    if (!openRouterKey) {
-        throw new Error('OpenRouter API Key is missing');
-    }
 
     let systemInstructions = '';
 
@@ -156,6 +155,8 @@ export const generateClarifyingQuestions = async (story, settings, projectSettin
     - "text": For open-ended questions.
     - "single_select": For questions with mutually exclusive options (radio buttons).
     - "multi_select": For questions where multiple options can be selected (checkboxes).
+    
+    If the provided options are not exhaustive, you may include an "Other" option as the last choice. This will allow the user to specify their own answer in a text field.
     
     Return the result as a JSON object where each key is a unique identifier (e.g., "question1", "question2") and the value is the question object.
     
@@ -225,55 +226,28 @@ export const generateClarifyingQuestions = async (story, settings, projectSettin
         userPrompt = `Project Context:\n${context}\n\n` + userPrompt;
     }
 
-    try {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${openRouterKey}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'http://localhost:5173',
-                'X-Title': 'StoryForge',
-            },
-            body: JSON.stringify({
-                model: largeModel,
-                messages: [
-                    { role: 'system', content: systemInstructions },
-                    { role: 'user', content: userPrompt }
-                ],
-                response_format: { type: 'json_object' }
-            })
-        });
+    const content = await callOpenRouter(openRouterKey, largeModel, [
+        { role: 'system', content: systemInstructions },
+        { role: 'user', content: userPrompt }
+    ]);
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error?.message || 'Failed to fetch from OpenRouter');
+    // Handle case where AI might wrap the array in an object key like "questions"
+    let parsed = JSON.parse(content);
+    if (!Array.isArray(parsed) && parsed.questions && Array.isArray(parsed.questions)) {
+        parsed = parsed.questions;
+    } else if (!Array.isArray(parsed)) {
+        // Fallback: Check if it's an object with numeric keys or just values
+        const values = Object.values(parsed);
+        if (values.length > 0 && typeof values[0] === 'object') {
+            // This is the expected format now (object with keys)
+            parsed = values;
+        } else {
+            console.warn("AI did not return an array, attempting to extract", parsed);
+            return [];
         }
-
-        const data = await response.json();
-        const content = data.choices[0].message.content;
-
-        // Handle case where AI might wrap the array in an object key like "questions"
-        let parsed = JSON.parse(content);
-        if (!Array.isArray(parsed) && parsed.questions && Array.isArray(parsed.questions)) {
-            parsed = parsed.questions;
-        } else if (!Array.isArray(parsed)) {
-            // Fallback: Check if it's an object with numeric keys or just values
-            const values = Object.values(parsed);
-            if (values.length > 0 && typeof values[0] === 'object') {
-                // This is the expected format now (object with keys)
-                parsed = values;
-            } else {
-                console.warn("AI did not return an array, attempting to extract", parsed);
-                return [];
-            }
-        }
-
-        return parsed;
-
-    } catch (error) {
-        console.error('AI Service Error (Clarifying Questions):', error);
-        throw error;
     }
+
+    return parsed;
 };
 
 export const generateVersionChangeDescription = async (oldVersion, newVersion, settings) => {
@@ -305,33 +279,10 @@ export const generateVersionChangeDescription = async (oldVersion, newVersion, s
     `;
 
     try {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${openRouterKey}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'http://localhost:5173',
-                'X-Title': 'StoryForge',
-            },
-            body: JSON.stringify({
-                model: smallModel,
-                messages: [
-                    { role: 'user', content: prompt }
-                ],
-                response_format: { type: 'json_object' }
-            })
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            console.error('Failed to fetch from OpenRouter for version description:', errorData);
-            return null;
-        }
-
-        const data = await response.json();
-        const content = data.choices[0].message.content;
+        const content = await callOpenRouter(openRouterKey, smallModel, [
+            { role: 'user', content: prompt }
+        ]);
         return JSON.parse(content);
-
     } catch (error) {
         console.error('AI Service Error (Version Description):', error);
         return null;
@@ -342,10 +293,6 @@ export const generateVersionChangeDescription = async (oldVersion, newVersion, s
 export const splitStory = async (story, settings, projectSettings = {}, userInstructions = '', qaContext = null) => {
     const { openRouterKey, largeModel } = settings;
     const { context, systemPrompt } = projectSettings;
-
-    if (!openRouterKey) {
-        throw new Error('OpenRouter API Key is missing');
-    }
 
     let systemInstructions = `
     You are an expert Product Owner and Business Analyst.
@@ -388,77 +335,38 @@ export const splitStory = async (story, settings, projectSettings = {}, userInst
         userPrompt = `Project Context:\n${context}\n\n` + userPrompt;
     }
 
-    try {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${openRouterKey}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'http://localhost:5173',
-                'X-Title': 'StoryForge',
-            },
-            body: JSON.stringify({
-                model: largeModel, // Use the large model for reasoning as requested
-                messages: [
-                    { role: 'system', content: systemInstructions },
-                    { role: 'user', content: userPrompt }
-                ],
-                response_format: { type: 'json_object' }
-            })
-        });
+    const content = await callOpenRouter(openRouterKey, largeModel, [
+        { role: 'system', content: systemInstructions },
+        { role: 'user', content: userPrompt }
+    ]);
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error?.message || 'Failed to fetch from OpenRouter');
-        }
+    let parsed = JSON.parse(content);
 
-        const data = await response.json();
-        const content = data.choices[0].message.content;
-
-        let parsed = JSON.parse(content);
-
-        // Handle potential wrapping
-        if (!Array.isArray(parsed) && parsed.stories && Array.isArray(parsed.stories)) {
-            parsed = parsed.stories;
-        } else if (!Array.isArray(parsed)) {
-            // Try to find an array in the object values
-            const values = Object.values(parsed);
-            const arrayValue = values.find(v => Array.isArray(v));
-            if (arrayValue) {
-                parsed = arrayValue;
+    // Handle potential wrapping
+    if (!Array.isArray(parsed) && parsed.stories && Array.isArray(parsed.stories)) {
+        parsed = parsed.stories;
+    } else if (!Array.isArray(parsed)) {
+        // Try to find an array in the object values
+        const values = Object.values(parsed);
+        const arrayValue = values.find(v => Array.isArray(v));
+        if (arrayValue) {
+            parsed = arrayValue;
+        } else {
+            // Check if the values themselves are the stories (e.g. {0: story, 1: story})
+            // We can check if the first value has a 'title' property
+            if (values.length > 0 && values[0] && typeof values[0] === 'object' && 'title' in values[0]) {
+                parsed = values;
             } else {
-                // Check if the values themselves are the stories (e.g. {0: story, 1: story})
-                // We can check if the first value has a 'title' property
-                if (values.length > 0 && values[0] && typeof values[0] === 'object' && 'title' in values[0]) {
-                    parsed = values;
-                } else {
-                    return [];
-                }
+                return [];
             }
         }
-
-        // Ensure string content for each story
-        const ensureString = (content) => {
-            if (typeof content === 'string') return content;
-            if (Array.isArray(content)) return content.join('\n\n');
-            if (typeof content === 'object' && content !== null) {
-                return Object.entries(content)
-                    .map(([key, value]) => `**${key}:** ${value}`)
-                    .join('\n\n');
-            }
-            return String(content || '');
-        };
-
-        return parsed.map(s => ({
-            title: s.title,
-            description: ensureString(s.description),
-            acceptanceCriteria: ensureString(s.acceptanceCriteria)
-        }));
-
-    } catch (error) {
-        console.error('AI Service Error (Split Story):', error);
-        throw error;
     }
+
+    return parsed.map(s => ({
+        title: s.title,
+        description: ensureString(s.description),
+        acceptanceCriteria: ensureString(s.acceptanceCriteria)
+    }));
 };
 
 export const generateSubfolderName = async (story, settings) => {
@@ -480,30 +388,10 @@ export const generateSubfolderName = async (story, settings) => {
     `;
 
     try {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${openRouterKey}`,
-                'Content-Type': 'application/json',
-                'HTTP-Referer': 'http://localhost:5173',
-                'X-Title': 'StoryForge',
-            },
-            body: JSON.stringify({
-                model: smallModel,
-                messages: [
-                    { role: 'user', content: prompt }
-                ]
-            })
-        });
-
-        if (!response.ok) {
-            return null;
-        }
-
-        const data = await response.json();
-        const content = data.choices[0].message.content;
+        const content = await callOpenRouter(openRouterKey, smallModel, [
+            { role: 'user', content: prompt }
+        ], { type: 'text' });
         return content.trim().replace(/['"]/g, '');
-
     } catch (error) {
         console.error('AI Service Error (Subfolder Name):', error);
         return null;

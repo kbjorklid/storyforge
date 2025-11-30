@@ -39,6 +39,35 @@ const createProjectSlice = (set, get) => ({
     })),
 });
 
+const createStoryObject = (parentId, title, description, acceptanceCriteria, author = 'user') => {
+    const newStoryId = uuidv4();
+    const initialVersionId = uuidv4();
+    const timestamp = new Date().toISOString();
+
+    const initialVersion = {
+        id: initialVersionId,
+        parentId: null,
+        timestamp,
+        title,
+        description,
+        acceptanceCriteria,
+        author
+    };
+
+    const newStory = {
+        id: newStoryId,
+        parentId,
+        title,
+        description,
+        acceptanceCriteria,
+        createdAt: timestamp,
+        versions: { [initialVersionId]: initialVersion },
+        currentVersionId: initialVersionId,
+    };
+
+    return { newStoryId, newStory };
+};
+
 const createContentSlice = (set) => ({
     folders: {}, // Record<string, Folder>
     stories: {}, // Record<string, Story>
@@ -241,40 +270,18 @@ const createContentSlice = (set) => ({
     }),
 
     addStory: (parentId, title, description, acceptanceCriteria) => {
-        const newStoryId = uuidv4();
-        const initialVersionId = uuidv4();
+        const { newStoryId, newStory } = createStoryObject(parentId, title, description, acceptanceCriteria);
 
         set((state) => {
-            const initialVersion = {
-                id: initialVersionId,
-                parentId: null,
-                timestamp: new Date().toISOString(),
-                title,
-                description,
-                acceptanceCriteria,
-                author: 'user'
-            };
-
-            const newStory = {
-                id: newStoryId,
-                parentId,
-                title,
-                description,
-                acceptanceCriteria,
-                createdAt: new Date().toISOString(),
-                versions: { [initialVersionId]: initialVersion },
-                currentVersionId: initialVersionId,
-            };
-
             const newState = {
-                stories: { ...state.stories, [newStory.id]: newStory },
+                stories: { ...state.stories, [newStoryId]: newStory },
                 folders: { ...state.folders }
             };
 
             if (parentId && state.folders[parentId]) {
                 newState.folders[parentId] = {
                     ...state.folders[parentId],
-                    stories: [...state.folders[parentId].stories, newStory.id]
+                    stories: [...state.folders[parentId].stories, newStoryId]
                 }
             }
 
@@ -486,30 +493,12 @@ const createContentSlice = (set) => ({
         const originalStory = state.stories[storyId];
         if (!originalStory) return state;
 
-        const newStoryId = uuidv4();
-        const initialVersionId = uuidv4();
-        const timestamp = new Date().toISOString();
-
-        const initialVersion = {
-            id: initialVersionId,
-            parentId: null,
-            timestamp,
-            title: `${originalStory.title} (duplicate)`,
-            description: originalStory.description,
-            acceptanceCriteria: originalStory.acceptanceCriteria,
-            author: 'user'
-        };
-
-        const newStory = {
-            id: newStoryId,
-            parentId: originalStory.parentId,
-            title: `${originalStory.title} (duplicate)`,
-            description: originalStory.description,
-            acceptanceCriteria: originalStory.acceptanceCriteria,
-            createdAt: timestamp,
-            versions: { [initialVersionId]: initialVersion },
-            currentVersionId: initialVersionId,
-        };
+        const { newStoryId, newStory } = createStoryObject(
+            originalStory.parentId,
+            `${originalStory.title} (duplicate)`,
+            originalStory.description,
+            originalStory.acceptanceCriteria
+        );
 
         const newState = {
             stories: { ...state.stories, [newStoryId]: newStory },
