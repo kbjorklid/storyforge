@@ -3,6 +3,7 @@ import { useStore } from '../store';
 import { Settings, Plus, Folder, Trash2, ChevronDown, ChevronRight, MoreVertical, FileText, Edit2 } from 'lucide-react';
 import FolderTree from './FolderTree';
 import Menu from './Menu';
+import ThemeToggle from './ThemeToggle';
 
 const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
     const { projects, currentProjectId, addProject, deleteProject, addFolder, addStory, moveStory, moveFolder, updateProject } = useStore();
@@ -169,8 +170,9 @@ const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
                 onMouseDown={startResizing}
                 className="sidebar-resizer"
             />
-            <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <h1 style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>StoryForge</h1>
+                <ThemeToggle />
             </div>
 
             <div style={{ flex: 1, overflowY: 'auto' }}>
