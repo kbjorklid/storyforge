@@ -484,7 +484,17 @@ export const chatWithStories = async (stories, messages, settings, projectSettin
     If the user asks for suggestions, provide them based on Agile best practices and the content of the stories.
     If the user asks about something not related to these stories, you can answer generally but try to tie it back to the project context if possible.
     
-    IMPORTANT: When using lists, ensure proper markdown nesting. If you have bullet points under a numbered list item, indent them by 4 spaces so they are rendered as nested lists.
+    IMPORTANT: When presenting multiple points or sections, prefer using second-level headers (##) for the top-level items instead of a numbered list.
+    
+    Discouraged:
+    1. First point
+       - Some explanation
+    
+    Encouraged:
+    ## 1. First point
+       - Some explanation
+
+    When using lists, ensure proper markdown nesting. If you have bullet points under a header or list item, indent them by 4 spaces so they are rendered as nested lists.
     `;
 
     if (systemPrompt) {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import { Sparkles, GitBranch, Scissors, Edit } from 'lucide-react';
+import { Sparkles, GitBranch, Scissors, Edit, MessageSquare } from 'lucide-react';
 import { improveStory, generateClarifyingQuestions, splitStory, generateSubfolderName } from '../services/ai';
 import ContentContainer from './ContentContainer';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -10,6 +10,7 @@ import EditTab from './StoryViewTabs/EditTab';
 import RewriteTab from './StoryViewTabs/RewriteTab';
 import SplitTab from './StoryViewTabs/SplitTab';
 import VersionsTab from './StoryViewTabs/VersionsTab';
+import ChatTab from './ChatTab';
 
 const StoryView = ({ storyId }) => {
     const { stories, saveStory, restoreVersion, settings, updateVersion, projects, addStory, deleteStory, unsavedStories, setStoryUnsaved, drafts, saveDraft, discardDraft, triggerVersionTitleGeneration, addFolder } = useStore();
@@ -511,6 +512,7 @@ const StoryView = ({ storyId }) => {
                 <TabButton active={activeTab === 'edit'} onClick={() => setActiveTab('edit')} icon={Edit} label="Edit Story" />
                 <TabButton active={activeTab === 'rewrite'} onClick={() => setActiveTab('rewrite')} icon={Sparkles} label="Rewrite Story" />
                 <TabButton active={activeTab === 'split'} onClick={() => setActiveTab('split')} icon={Scissors} label="Split Story" />
+                <TabButton active={activeTab === 'chat'} onClick={() => setActiveTab('chat')} icon={MessageSquare} label="Chat with AI" />
                 <TabButton active={activeTab === 'versions'} onClick={() => setActiveTab('versions')} icon={GitBranch} label="Versions" />
             </div>
 
@@ -605,6 +607,16 @@ const StoryView = ({ storyId }) => {
                         unsavedStories={unsavedStories}
                         handleSplit={handleSplit}
                     />
+                )}
+
+                {activeTab === 'chat' && (
+                    <div style={{ height: '600px' }}>
+                        <ChatTab
+                            projectId={projectContext?.id}
+                            initialStoryId={storyId}
+                            autoStart={true}
+                        />
+                    </div>
                 )}
             </AnimatePresence>
         </ContentContainer>

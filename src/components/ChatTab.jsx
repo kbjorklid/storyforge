@@ -5,11 +5,16 @@ import { MessageSquare, Send, ArrowLeft, Bot, User } from 'lucide-react';
 import { chatWithStories } from '../services/ai';
 import ReactMarkdown from 'react-markdown';
 
-const ChatTab = ({ projectId }) => {
+const ChatTab = ({ projectId, initialStoryId = null, autoStart = false }) => {
     const { projects, stories, settings } = useStore();
     const project = projects.find(p => p.id === projectId);
-    const [selectedStoryIds, setSelectedStoryIds] = useState([]);
-    const [chatStarted, setChatStarted] = useState(false);
+
+    // Initialize selectedStoryIds with initialStoryId if provided
+    const [selectedStoryIds, setSelectedStoryIds] = useState(initialStoryId ? [initialStoryId] : []);
+
+    // Initialize chatStarted based on autoStart
+    const [chatStarted, setChatStarted] = useState(autoStart);
+
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -22,6 +27,20 @@ const ChatTab = ({ projectId }) => {
     useEffect(() => {
         scrollToBottom();
     }, [messages]);
+
+    // Handle auto-start welcome message
+    useEffect(() => {
+        if (autoStart && messages.length === 0) {
+            setMessages([
+                {
+                    role: 'assistant',
+                    content: initialStoryId
+                        ? "I'm ready to chat about this story. What would you like to know?"
+                        : `I'm ready to chat about the ${selectedStoryIds.length} stories you selected. What would you like to know?`
+                }
+            ]);
+        }
+    }, [autoStart, initialStoryId, selectedStoryIds.length]);
 
     const handleToggleStory = (storyId) => {
         setSelectedStoryIds(prev => {
@@ -108,72 +127,79 @@ const ChatTab = ({ projectId }) => {
                     alignItems: 'center',
                     gap: '1rem'
                 }}>
-                    <button
-                        onClick={() => setChatStarted(false)}
-                        style={{
-                            background: 'none',
-                            border: 'none',
-                            color: 'var(--color-text-secondary)',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem'
-                        }}
-                    >
-                        <ArrowLeft size={16} /> Back to Selection
-                    </button>
-                    <h3 style={{ margin: 0, fontSize: '1rem' }}>Chatting about {selectedStoryIds.length} stories</h3>
+                    {!autoStart && (
+                        <button
+                            onClick={() => setChatStarted(false)}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--color-text-secondary)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem'
+                            }}
+                        >
+                            <ArrowLeft size={16} /> Back to Selection
+                        </button>
+                    )}
+                    <h3 style={{ margin: 0, fontSize: '1rem' }}>
+                        {initialStoryId ? 'Chatting about this story' : `Chatting about ${selectedStoryIds.length} stories`}
+                    </h3>
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {messages.map((msg, index) => (
-                        <div key={index} style={{
-                            display: 'flex',
-                            gap: '0.75rem',
-                            alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                            maxWidth: '80%'
-                        }}>
-                            {msg.role === 'assistant' && (
-                                <div style={{
-                                    width: '32px',
-                                    height: '32px',
-                                    borderRadius: '50%',
-                                    backgroundColor: 'var(--color-accent)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    flexShrink: 0
-                                }}>
-                                    <Bot size={18} color="white" />
-                                </div>
-                            )}
-                            <div className="markdown-content" style={{
-                                padding: '0.75rem 1rem',
-                                borderRadius: '8px',
-                                backgroundColor: msg.role === 'user' ? 'var(--color-accent)' : 'var(--color-bg-secondary)',
-                                color: msg.role === 'user' ? 'white' : 'var(--color-text-primary)',
-                                border: msg.role === 'user' ? 'none' : '1px solid var(--color-border)',
-                                fontSize: '0.95rem',
-                                lineHeight: '1.5'
+                    {messages.map((msg, index) => {
+                        if (isLoading && index === messages.length - 1 && msg.role === 'assistant' && !msg.content) return null;
+                        return (
+                            <div key={index} style={{
+                                display: 'flex',
+                                gap: '0.75rem',
+                                alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
+                                maxWidth: '80%'
                             }}>
-                                <ReactMarkdown>{msg.content}</ReactMarkdown>
-                            </div>
-                            {msg.role === 'user' && (
-                                <div style={{
-                                    width: '32px',
-                                    height: '32px',
-                                    borderRadius: '50%',
-                                    backgroundColor: 'var(--color-text-secondary)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    flexShrink: 0
+                                {msg.role === 'assistant' && (
+                                    <div style={{
+                                        width: '32px',
+                                        height: '32px',
+                                        borderRadius: '50%',
+                                        backgroundColor: 'var(--color-accent)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0
+                                    }}>
+                                        <Bot size={18} color="white" />
+                                    </div>
+                                )}
+                                <div className="markdown-content" style={{
+                                    padding: '0.75rem 1rem',
+                                    borderRadius: '8px',
+                                    backgroundColor: msg.role === 'user' ? 'var(--color-accent)' : 'var(--color-bg-secondary)',
+                                    color: msg.role === 'user' ? 'white' : 'var(--color-text-primary)',
+                                    border: msg.role === 'user' ? 'none' : '1px solid var(--color-border)',
+                                    fontSize: '0.95rem',
+                                    lineHeight: '1.5'
                                 }}>
-                                    <User size={18} color="white" />
+                                    <ReactMarkdown>{msg.content}</ReactMarkdown>
                                 </div>
-                            )}
-                        </div>
-                    ))}
+                                {msg.role === 'user' && (
+                                    <div style={{
+                                        width: '32px',
+                                        height: '32px',
+                                        borderRadius: '50%',
+                                        backgroundColor: 'var(--color-text-secondary)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        flexShrink: 0
+                                    }}>
+                                        <User size={18} color="white" />
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
                     {isLoading && messages[messages.length - 1]?.role === 'assistant' && messages[messages.length - 1]?.content === '' && (
                         <div style={{ display: 'flex', gap: '0.75rem', alignSelf: 'flex-start' }}>
                             <div style={{

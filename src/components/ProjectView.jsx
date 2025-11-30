@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import { Settings, LayoutDashboard, Trash2, RotateCcw, MessageSquare } from 'lucide-react';
+import { Settings, Trash2, RotateCcw, MessageSquare } from 'lucide-react';
 import ChatTab from './ChatTab';
 
 const ProjectView = ({ projectId }) => {
     const { projects, updateProject, stories, folders, restoreStory, permanentlyDeleteStory } = useStore();
     const project = projects.find(p => p.id === projectId);
-    const [activeTab, setActiveTab] = useState('overview');
+    const [activeTab, setActiveTab] = useState('chat');
     const [formData, setFormData] = useState({
         context: '',
         systemPrompt: ''
@@ -61,18 +61,18 @@ const ProjectView = ({ projectId }) => {
                 <h2 style={{ margin: 0, color: 'var(--color-text-primary)' }}>{project.name}</h2>
                 <div style={{ display: 'flex', gap: '1rem' }}>
                     <button
-                        onClick={() => setActiveTab('overview')}
+                        onClick={() => setActiveTab('chat')}
                         style={{
                             display: 'flex',
                             alignItems: 'center',
                             gap: '0.5rem',
                             padding: '0.5rem 1rem',
-                            backgroundColor: activeTab === 'overview' ? 'var(--color-bg-tertiary)' : 'transparent',
+                            backgroundColor: activeTab === 'chat' ? 'var(--color-bg-tertiary)' : 'transparent',
                             borderRadius: '4px',
-                            color: activeTab === 'overview' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)'
+                            color: activeTab === 'chat' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)'
                         }}
                     >
-                        <LayoutDashboard size={16} /> Overview
+                        <MessageSquare size={16} /> Chat With AI
                     </button>
                     <button
                         onClick={() => setActiveTab('settings')}
@@ -102,28 +102,12 @@ const ProjectView = ({ projectId }) => {
                     >
                         <Trash2 size={16} /> Deleted Stories
                     </button>
-                    <button
-                        onClick={() => setActiveTab('chat')}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            padding: '0.5rem 1rem',
-                            backgroundColor: activeTab === 'chat' ? 'var(--color-bg-tertiary)' : 'transparent',
-                            borderRadius: '4px',
-                            color: activeTab === 'chat' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)'
-                        }}
-                    >
-                        <MessageSquare size={16} /> Chat With AI
-                    </button>
                 </div>
             </div>
 
             <div style={{ flex: 1, padding: '2rem', overflowY: 'auto' }}>
-                {activeTab === 'overview' ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--color-text-secondary)' }}>
-                        <p>Select a story from the sidebar to edit, or create a new one.</p>
-                    </div>
+                {activeTab === 'chat' ? (
+                    <ChatTab projectId={projectId} />
                 ) : activeTab === 'settings' ? (
                     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
                         <div style={{ marginBottom: '2rem' }}>
@@ -174,8 +158,6 @@ const ProjectView = ({ projectId }) => {
                             />
                         </div>
                     </div>
-                ) : activeTab === 'chat' ? (
-                    <ChatTab projectId={projectId} />
                 ) : activeTab === 'deleted' ? (
                     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
                         <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-text-primary)' }}>Deleted Stories</h3>
