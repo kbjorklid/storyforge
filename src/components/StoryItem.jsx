@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
+import { useToast } from '../contexts/ToastContext';
 import { FileText, MoreVertical, Copy, Trash2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Menu from './Menu';
 
 const StoryItem = ({ storyId, onSelectStory, selectedStoryId, marginLeft = '24px' }) => {
-    const { stories, deleteStory, unsavedStories, drafts, duplicateStory } = useStore();
+    const { stories, deleteStory, restoreStory, unsavedStories, drafts, duplicateStory } = useStore();
+    const { showToast } = useToast();
     const story = stories[storyId];
     const [activeMenu, setActiveMenu] = useState(null);
 
@@ -28,9 +30,11 @@ const StoryItem = ({ storyId, onSelectStory, selectedStoryId, marginLeft = '24px
                 duplicateStory(id);
                 break;
             case 'delete-story':
-                if (confirm('Are you sure you want to delete this story?')) {
-                    deleteStory(id);
-                }
+                deleteStory(id);
+                showToast('Story deleted', 'success', {
+                    label: 'Undo',
+                    onClick: () => restoreStory(id)
+                });
                 break;
         }
         setActiveMenu(null);
