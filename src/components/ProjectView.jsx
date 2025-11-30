@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import { Settings, LayoutDashboard, Trash2, RotateCcw } from 'lucide-react';
+import { Settings, LayoutDashboard, Trash2, RotateCcw, MessageSquare } from 'lucide-react';
+import ChatTab from './ChatTab';
 
 const ProjectView = ({ projectId }) => {
     const { projects, updateProject, stories, folders, restoreStory, permanentlyDeleteStory } = useStore();
@@ -101,6 +102,20 @@ const ProjectView = ({ projectId }) => {
                     >
                         <Trash2 size={16} /> Deleted Stories
                     </button>
+                    <button
+                        onClick={() => setActiveTab('chat')}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            padding: '0.5rem 1rem',
+                            backgroundColor: activeTab === 'chat' ? 'var(--color-bg-tertiary)' : 'transparent',
+                            borderRadius: '4px',
+                            color: activeTab === 'chat' ? 'var(--color-text-primary)' : 'var(--color-text-secondary)'
+                        }}
+                    >
+                        <MessageSquare size={16} /> Chat With AI
+                    </button>
                 </div>
             </div>
 
@@ -159,6 +174,8 @@ const ProjectView = ({ projectId }) => {
                             />
                         </div>
                     </div>
+                ) : activeTab === 'chat' ? (
+                    <ChatTab projectId={projectId} />
                 ) : activeTab === 'deleted' ? (
                     <div style={{ maxWidth: '800px', margin: '0 auto' }}>
                         <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-text-primary)' }}>Deleted Stories</h3>

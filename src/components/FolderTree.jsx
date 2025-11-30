@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useStore } from '../store';
 import { Folder, FileText, ChevronRight, ChevronDown, Plus, Trash2, MoreVertical, Edit2, Copy } from 'lucide-react';
 import Menu from './Menu';
-import { motion, AnimatePresence } from 'framer-motion';
 import StoryItem from './StoryItem';
 
 const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searchTerm = '' }) => {
@@ -144,9 +143,7 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
 
     return (
         <div style={{ marginLeft: depth > 0 ? '12px' : '0' }}>
-            <motion.div
-                layout
-                initial={false}
+            <div
                 style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -165,7 +162,6 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                whileHover={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}
             >
                 <button
                     onClick={(e) => {
@@ -174,12 +170,15 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
                     }}
                     style={{ padding: 0, background: 'transparent', border: 'none', marginRight: '0.25rem', color: 'var(--color-text-secondary)', cursor: 'pointer' }}
                 >
-                    <motion.div
-                        animate={{ rotate: isOpen ? 90 : 0 }}
-                        transition={{ duration: 0.2 }}
+                    <div
+                        style={{
+                            transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                            display: 'flex',
+                            alignItems: 'center'
+                        }}
                     >
                         <ChevronRight size={14} />
-                    </motion.div>
+                    </div>
                 </button>
                 <Folder size={14} style={{ marginRight: '0.5rem', color: 'var(--color-accent)' }} />
                 <span style={{ fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folder.name}</span>
@@ -214,64 +213,58 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
                         ]}
                     />
                 )}
-            </motion.div>
+            </div>
 
-            <AnimatePresence initial={false}>
-                {isOpen && (
-                    <motion.div
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.2, ease: "easeInOut" }}
-                        style={{ overflow: 'hidden' }}
-                    >
-                        {isAdding && (
-                            <div style={{ marginLeft: '12px', padding: '0.25rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
-                                <input
-                                    autoFocus
-                                    type="text"
-                                    value={newItemName}
-                                    onChange={(e) => setNewItemName(e.target.value)}
-                                    placeholder={`Name...`}
-                                    style={{
-                                        width: '100%',
-                                        fontSize: '0.8rem',
-                                        padding: '0.1rem 0.25rem',
-                                        background: 'var(--color-bg-primary)',
-                                        border: '1px solid var(--color-border)',
-                                        color: 'var(--color-text-primary)'
-                                    }}
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') handleAdd(isAdding);
-                                        if (e.key === 'Escape') setIsAdding(null);
-                                    }}
-                                />
-                            </div>
-                        )}
-
-                        {folder.children.map(childId => (
-                            <FolderItem
-                                key={childId}
-                                folderId={childId}
-                                depth={depth + 1}
-                                onSelectStory={onSelectStory}
-                                selectedStoryId={selectedStoryId}
-                                searchTerm={searchTerm}
+            {isOpen && (
+                <div
+                    style={{ overflow: 'hidden' }}
+                >
+                    {isAdding && (
+                        <div style={{ marginLeft: '12px', padding: '0.25rem', display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                            <input
+                                autoFocus
+                                type="text"
+                                value={newItemName}
+                                onChange={(e) => setNewItemName(e.target.value)}
+                                placeholder={`Name...`}
+                                style={{
+                                    width: '100%',
+                                    fontSize: '0.8rem',
+                                    padding: '0.1rem 0.25rem',
+                                    background: 'var(--color-bg-primary)',
+                                    border: '1px solid var(--color-border)',
+                                    color: 'var(--color-text-primary)'
+                                }}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleAdd(isAdding);
+                                    if (e.key === 'Escape') setIsAdding(null);
+                                }}
                             />
-                        ))}
+                        </div>
+                    )}
 
-                        {filteredStories.map(storyId => (
-                            <StoryItem
-                                key={storyId}
-                                storyId={storyId}
-                                onSelectStory={onSelectStory}
-                                selectedStoryId={selectedStoryId}
-                                marginLeft="24px"
-                            />
-                        ))}
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                    {folder.children.map(childId => (
+                        <FolderItem
+                            key={childId}
+                            folderId={childId}
+                            depth={depth + 1}
+                            onSelectStory={onSelectStory}
+                            selectedStoryId={selectedStoryId}
+                            searchTerm={searchTerm}
+                        />
+                    ))}
+
+                    {filteredStories.map(storyId => (
+                        <StoryItem
+                            key={storyId}
+                            storyId={storyId}
+                            onSelectStory={onSelectStory}
+                            selectedStoryId={selectedStoryId}
+                            marginLeft="24px"
+                        />
+                    ))}
+                </div>
+            )}
         </div>
     );
 };

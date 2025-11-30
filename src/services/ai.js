@@ -397,3 +397,53 @@ export const generateSubfolderName = async (story, settings) => {
         return null;
     }
 };
+
+export const chatWithStories = async (stories, messages, settings, projectSettings = {}) => {
+    const { openRouterKey, largeModel } = settings;
+    const { context, systemPrompt } = projectSettings;
+
+    if (!openRouterKey) {
+        throw new Error('OpenRouter API Key is missing');
+    }
+
+    let systemInstructions = `
+    You are a helpful assistant and expert Product Owner/Business Analyst.
+    You are chatting with a user about a specific set of user stories.
+    
+    Here are the stories you have context for:
+    ${stories.map(s => `
+    ---
+    Title: ${s.title}
+    Description: ${s.description}
+    Acceptance Criteria: ${s.acceptanceCriteria}
+    ---
+    `).join('\n')}
+
+    Answer the user's questions based on these stories.
+    If the user asks for suggestions, provide them based on Agile best practices and the content of the stories.
+    If the user asks about something not related to these stories, you can answer generally but try to tie it back to the project context if possible.
+    `;
+
+    if (systemPrompt) {
+        systemInstructions += `\n\nAdditional Project Instructions:\n${systemPrompt}`;
+    }
+
+    if (context) {
+        systemInstructions += `\n\nProject Context:\n${context}`;
+    }
+
+    // Filter out the local-only system message we added in the UI
+    const apiMessages = messages.filter(m => m.role !== 'system');
+
+    try {
+        const content = await callOpenRouter(openRouterKey, largeModel, [
+            { role: 'system', content: systemInstructions },
+            ...apiMessages
+        ], { type: 'text' }); // We expect text response, not JSON
+
+        return content;
+    } catch (error) {
+        console.error('AI Service Error (Chat):', error);
+        throw error;
+    }
+};

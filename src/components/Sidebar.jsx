@@ -165,7 +165,7 @@ const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
                     cursor: 'col-resize',
                     backgroundColor: isResizing ? 'var(--color-primary)' : 'transparent',
                     zIndex: 10,
-                    transition: 'background-color 0.2s'
+                    zIndex: 10,
                 }}
                 onMouseDown={startResizing}
                 className="sidebar-resizer"
