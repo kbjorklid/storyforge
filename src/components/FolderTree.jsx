@@ -4,7 +4,7 @@ import { Folder, FileText, ChevronRight, ChevronDown, Plus, Trash2, MoreVertical
 import Menu from './Menu';
 
 const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searchTerm = '' }) => {
-    const { folders, stories, addFolder, addStory, deleteStory, moveStory, moveFolder, unsavedStories, deleteFolder, updateFolder } = useStore();
+    const { folders, stories, addFolder, addStory, deleteStory, moveStory, moveFolder, unsavedStories, deleteFolder, updateFolder, drafts } = useStore();
     const folder = folders[folderId];
     const [isOpen, setIsOpen] = useState(true);
     const [isAdding, setIsAdding] = useState(null); // 'folder' or 'story'
@@ -276,7 +276,7 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
                                 className="story-row"
                             >
                                 <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
-                                    <FileText size={12} style={{ marginRight: '0.5rem', minWidth: '12px' }} />
+                                    <FileText size={12} style={{ marginRight: '0.5rem', minWidth: '12px', color: drafts[storyId] ? 'var(--color-warning)' : 'var(--color-success)' }} />
                                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{story.title}</span>
                                     {unsavedStories[storyId] && (
                                         <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', marginLeft: '6px', flexShrink: 0 }}></div>
@@ -310,7 +310,7 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
 };
 
 const FolderTree = ({ rootFolderId, onSelectStory, selectedStoryId, searchTerm }) => {
-    const { folders, stories, deleteStory, unsavedStories } = useStore();
+    const { folders, stories, deleteStory, unsavedStories, drafts } = useStore();
     const rootFolder = folders[rootFolderId];
 
     if (!rootFolder) return null;
@@ -368,7 +368,7 @@ const FolderTree = ({ rootFolderId, onSelectStory, selectedStoryId, searchTerm }
                         className="story-row"
                     >
                         <div style={{ display: 'flex', alignItems: 'center', overflow: 'hidden' }}>
-                            <FileText size={12} style={{ marginRight: '0.5rem', minWidth: '12px' }} />
+                            <FileText size={12} style={{ marginRight: '0.5rem', minWidth: '12px', color: drafts[storyId] ? 'var(--color-warning)' : 'var(--color-success)' }} />
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{story.title}</span>
                             {unsavedStories[storyId] && (
                                 <div style={{ width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', marginLeft: '6px', flexShrink: 0 }}></div>

@@ -132,6 +132,7 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect,
         // Circles
         node.append("circle")
             .attr("fill", d => {
+                if (d.data.id === 'draft') return "var(--color-warning)";
                 if (d.data.id === currentVersionId) return "var(--color-accent)";
                 if (d.data.id === selectedVersionId) return "var(--color-text-primary)";
                 return "#94a3b8"; // Light gray (slate-400) for better visibility
@@ -157,6 +158,7 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect,
             .attr("text-anchor", d => d.children ? "end" : "start")
             .attr("fill", "var(--color-text-primary)") // Correct variable
             .text(d => {
+                if (d.data.id === 'draft') return "Draft";
                 if (d.data.changeTitle) {
                     return d.data.changeTitle.length > 15
                         ? d.data.changeTitle.substring(0, 15) + '...'
