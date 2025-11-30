@@ -4,6 +4,38 @@ import * as d3 from 'd3';
 const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect, draft }) => {
     const svgRef = useRef(null);
     const containerRef = useRef(null);
+    const onSelectRef = useRef(onSelect);
+    const currentVersionIdRef = useRef(currentVersionId);
+    const selectedVersionIdRef = useRef(selectedVersionId);
+
+    useEffect(() => {
+        onSelectRef.current = onSelect;
+        currentVersionIdRef.current = currentVersionId;
+        selectedVersionIdRef.current = selectedVersionId;
+    }, [onSelect, currentVersionId, selectedVersionId]);
+
+    // Update styles when selection changes without redrawing
+    useEffect(() => {
+        if (!svgRef.current) return;
+        const svg = d3.select(svgRef.current);
+
+        svg.selectAll(".node-circle")
+            .transition().duration(200)
+            .attr("r", d => (d.data.id === currentVersionId || d.data.id === selectedVersionId) ? 10 : 6)
+            .style("filter", d => (d.data.id === currentVersionId || d.data.id === selectedVersionId || d.data.id === 'draft') ? "url(#glow)" : "none")
+            .attr("fill", d => {
+                if (d.data.id === 'draft') return "var(--color-warning)";
+                if (d.data.id === currentVersionId) return "var(--color-accent)";
+                if (d.data.id === selectedVersionId) return "var(--color-text-primary)";
+                return "var(--color-bg-primary)";
+            })
+            .attr("stroke", d => {
+                if (d.data.id === 'draft') return "var(--color-warning)";
+                if (d.data.id === currentVersionId) return "var(--color-accent)";
+                if (d.data.id === selectedVersionId) return "var(--color-text-primary)";
+                return "var(--color-text-secondary)";
+            });
+    }, [currentVersionId, selectedVersionId]);
 
     useEffect(() => {
         if (!versions || Object.keys(versions).length === 0 || !svgRef.current) return;
@@ -25,7 +57,7 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect,
         if (draft) {
             data.push({
                 id: 'draft',
-                parentId: draft.baseVersionId || currentVersionId,
+                parentId: draft.baseVersionId || currentVersionIdRef.current,
                 timestamp: draft.timestamp,
                 title: draft.content.title,
                 description: draft.content.description,
@@ -82,7 +114,7 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect,
         // Center logic
         let targetNode = root.descendants().find(d => d.data.id === 'draft');
         if (!targetNode) {
-            targetNode = root.descendants().find(d => d.data.id === currentVersionId);
+            targetNode = root.descendants().find(d => d.data.id === currentVersionIdRef.current);
         }
         if (!targetNode && root.descendants().length > 0) {
             const descendants = root.descendants();
@@ -127,7 +159,9 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect,
             .attr("transform", d => `translate(${d.y},${d.x})`)
             .attr("cursor", "pointer")
             .on("click", (event, d) => {
-                onSelect(d.data.id);
+                if (onSelectRef.current) {
+                    onSelectRef.current(d.data.id);
+                }
             })
             .on("mouseenter", function () {
                 d3.select(this).select("circle")
@@ -136,7 +170,7 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect,
                     .style("filter", "url(#glow)");
             })
             .on("mouseleave", function (event, d) {
-                const isSelected = d.data.id === selectedVersionId || d.data.id === currentVersionId;
+                const isSelected = d.data.id === selectedVersionIdRef.current || d.data.id === currentVersionIdRef.current;
                 d3.select(this).select("circle")
                     .transition().duration(200)
                     .attr("r", isSelected ? 10 : 6)
@@ -145,25 +179,26 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect,
 
         // Node Circles
         node.append("circle")
+            .attr("class", "node-circle")
             .attr("r", 0) // Start at 0 for animation
             .attr("fill", d => {
                 if (d.data.id === 'draft') return "var(--color-warning)";
-                if (d.data.id === currentVersionId) return "var(--color-accent)";
-                if (d.data.id === selectedVersionId) return "var(--color-text-primary)";
+                if (d.data.id === currentVersionIdRef.current) return "var(--color-accent)";
+                if (d.data.id === selectedVersionIdRef.current) return "var(--color-text-primary)";
                 return "var(--color-bg-primary)";
             })
             .attr("stroke", d => {
                 if (d.data.id === 'draft') return "var(--color-warning)";
-                if (d.data.id === currentVersionId) return "var(--color-accent)";
-                if (d.data.id === selectedVersionId) return "var(--color-text-primary)";
+                if (d.data.id === currentVersionIdRef.current) return "var(--color-accent)";
+                if (d.data.id === selectedVersionIdRef.current) return "var(--color-text-primary)";
                 return "var(--color-text-secondary)";
             })
             .attr("stroke-width", 2)
-            .style("filter", d => (d.data.id === currentVersionId || d.data.id === selectedVersionId || d.data.id === 'draft') ? "url(#glow)" : "none")
+            .style("filter", d => (d.data.id === currentVersionIdRef.current || d.data.id === selectedVersionIdRef.current || d.data.id === 'draft') ? "url(#glow)" : "none")
             .transition()
             .duration(500)
             .delay((d, i) => i * 50)
-            .attr("r", d => (d.data.id === currentVersionId || d.data.id === selectedVersionId) ? 10 : 6);
+            .attr("r", d => (d.data.id === currentVersionIdRef.current || d.data.id === selectedVersionIdRef.current) ? 10 : 6);
 
         // Labels
         node.append("text")
@@ -201,7 +236,7 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect,
             }
         });
 
-    }, [versions, currentVersionId, selectedVersionId, onSelect, draft]);
+    }, [versions, draft]);
 
     return (
         <div ref={containerRef} style={{ width: '100%', height: '100%', overflow: 'hidden', borderRadius: '8px', background: 'rgba(0,0,0,0.2)' }}>
