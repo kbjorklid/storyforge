@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import * as d3 from 'd3';
 
-const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect }) => {
+const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect, draft }) => {
     const svgRef = useRef(null);
     const containerRef = useRef(null);
 
@@ -21,6 +21,17 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect 
             parentId: v.parentId,
             ...v
         }));
+
+        if (draft) {
+            data.push({
+                id: 'draft',
+                parentId: draft.baseVersionId || currentVersionId, // Fallback to current if base not found (shouldn't happen)
+                timestamp: draft.timestamp,
+                title: draft.content.title,
+                description: draft.content.description,
+                author: 'draft'
+            });
+        }
 
         // Handle root(s)
         // If there are multiple roots (which shouldn't happen in a single story tree usually, but legacy might cause it),
@@ -128,8 +139,10 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect 
             .attr("stroke", d => {
                 if (d.data.id === currentVersionId) return "var(--color-accent)";
                 if (d.data.id === selectedVersionId) return "var(--color-text-primary)";
+                if (d.data.id === 'draft') return "var(--color-warning)";
                 return "var(--color-text-primary)"; // Bright stroke
             })
+            .attr("stroke-dasharray", d => d.data.id === 'draft' ? "2,2" : "none")
             .attr("stroke-width", 2)
             .attr("r", 6)
             .attr("cursor", "pointer")
@@ -166,10 +179,19 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect 
                     .attr("font-weight", "bold")
                     .attr("font-size", "8px")
                     .text("AI");
+            } else if (d.data.author === 'draft') {
+                d3.select(this).append("text")
+                    .attr("dy", "-1em")
+                    .attr("x", 0)
+                    .attr("text-anchor", "middle")
+                    .attr("fill", "var(--color-warning)")
+                    .attr("font-weight", "bold")
+                    .attr("font-size", "8px")
+                    .text("DRAFT");
             }
         });
 
-    }, [versions, currentVersionId, selectedVersionId, onSelect]);
+    }, [versions, currentVersionId, selectedVersionId, onSelect, draft]);
 
     return (
         <div ref={containerRef} style={{ width: '100%', height: '100%', overflow: 'hidden', border: '1px solid var(--color-border)', borderRadius: '8px', backgroundColor: 'var(--color-bg-secondary)' }}>

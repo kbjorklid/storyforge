@@ -41,6 +41,24 @@ const createProjectSlice = (set, get) => ({
 const createContentSlice = (set) => ({
     folders: {}, // Record<string, Folder>
     stories: {}, // Record<string, Story>
+    drafts: {}, // Record<string, { content: StoryContent, timestamp: string, baseVersionId: string }>
+
+    saveDraft: (storyId, content, baseVersionId) => set((state) => ({
+        drafts: {
+            ...state.drafts,
+            [storyId]: {
+                content,
+                timestamp: new Date().toISOString(),
+                baseVersionId
+            }
+        }
+    })),
+
+    discardDraft: (storyId) => set((state) => {
+        const newDrafts = { ...state.drafts };
+        delete newDrafts[storyId];
+        return { drafts: newDrafts };
+    }),
 
     addFolder: (id, parentId, name, projectId) => set((state) => {
         const newFolder = {
@@ -301,6 +319,11 @@ const createContentSlice = (set) => ({
                     const newUnsaved = { ...state.unsavedStories };
                     delete newUnsaved[id];
                     return newUnsaved;
+                })(),
+                drafts: (() => {
+                    const newDrafts = { ...state.drafts };
+                    delete newDrafts[id];
+                    return newDrafts;
                 })()
             };
         });
@@ -323,7 +346,12 @@ const createContentSlice = (set) => ({
                     acceptanceCriteria: version.acceptanceCriteria,
                     currentVersionId: versionId
                 }
-            }
+            },
+            drafts: (() => {
+                const newDrafts = { ...state.drafts };
+                delete newDrafts[storyId];
+                return newDrafts;
+            })()
         };
     }),
 
@@ -363,7 +391,12 @@ const createContentSlice = (set) => ({
             stories: {
                 ...state.stories,
                 [id]: { ...story, deleted: true }
-            }
+            },
+            drafts: (() => {
+                const newDrafts = { ...state.drafts };
+                delete newDrafts[id];
+                return newDrafts;
+            })()
         };
     }),
 

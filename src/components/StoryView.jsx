@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store';
-import { Sparkles, Save, GitBranch, Scissors } from 'lucide-react';
+import { Sparkles, Save, GitBranch, Scissors, RotateCcw } from 'lucide-react';
 import { improveStory, generateVersionChangeDescription, generateClarifyingQuestions, splitStory } from '../services/ai';
 import ContentContainer from './ContentContainer';
 import VersionGraph from './VersionGraph';
 
 const StoryView = ({ storyId }) => {
-    const { stories, saveStory, restoreVersion, settings, updateVersion, projects, addStory, deleteStory, unsavedStories, setStoryUnsaved } = useStore();
+    const { stories, saveStory, restoreVersion, settings, updateVersion, projects, addStory, deleteStory, unsavedStories, setStoryUnsaved, drafts, saveDraft, discardDraft } = useStore();
     const story = stories[storyId];
     // const project = projects.find(p => p.id === story?.parentId) || projects.find(p => p.rootFolderId === story?.parentId);
 
@@ -44,18 +44,42 @@ const StoryView = ({ storyId }) => {
 
     useEffect(() => {
         if (story) {
-            setFormData({
-                title: story.title,
-                description: story.description,
-                acceptanceCriteria: story.acceptanceCriteria
-            });
-            if (!selectedVersionId && story.currentVersionId) {
-                setSelectedVersionId(story.currentVersionId);
+            // Check for draft first
+            if (drafts[storyId]) {
+                const draft = drafts[storyId];
+                setFormData(draft.content);
+                setStoryUnsaved(storyId, true);
+            } else {
+                setFormData({
+                    title: story.title,
+                    description: story.description,
+                    acceptanceCriteria: story.acceptanceCriteria
+                });
+                if (!selectedVersionId && story.currentVersionId) {
+                    setSelectedVersionId(story.currentVersionId);
+                }
+                // Reset unsaved state when story changes or loads
+                setStoryUnsaved(storyId, false);
             }
-            // Reset unsaved state when story changes or loads
-            setStoryUnsaved(storyId, false);
         }
     }, [storyId, story?.currentVersionId]); // Only reset when ID or version changes, not when story object updates (which happens on save)
+
+    // Save draft on change
+    useEffect(() => {
+        if (!story) return;
+
+        const hasChanges =
+            formData.title !== story.title ||
+            formData.description !== story.description ||
+            formData.acceptanceCriteria !== story.acceptanceCriteria;
+
+        if (hasChanges) {
+            const timeoutId = setTimeout(() => {
+                saveDraft(storyId, formData, story.currentVersionId);
+            }, 500); // Debounce draft saving
+            return () => clearTimeout(timeoutId);
+        }
+    }, [formData, story, storyId, saveDraft]);
 
     // Check for unsaved changes
     useEffect(() => {
@@ -98,6 +122,16 @@ const StoryView = ({ storyId }) => {
                 }
             });
         }
+    };
+
+    const handleDiscard = () => {
+        discardDraft(storyId);
+        setFormData({
+            title: story.title,
+            description: story.description,
+            acceptanceCriteria: story.acceptanceCriteria
+        });
+        setStoryUnsaved(storyId, false);
     };
 
     const handleImprove = async () => {
@@ -318,25 +352,43 @@ const StoryView = ({ storyId }) => {
                     {story.title}
                     {unsavedStories[storyId] && (
                         <span style={{ fontSize: '0.8rem', color: 'var(--color-warning)', backgroundColor: 'rgba(245, 158, 11, 0.1)', padding: '0.2rem 0.5rem', borderRadius: '4px', border: '1px solid var(--color-warning)' }}>
-                            Unsaved Changes
+                            {drafts[storyId] ? 'Unsaved Draft Restored' : 'Unsaved Changes'}
                         </span>
                     )}
                 </h2>
-                {activeTab === 'edit' && (
-                    <button
-                        onClick={handleSave}
-                        disabled={!unsavedStories[storyId]}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.5rem',
-                            opacity: unsavedStories[storyId] ? 1 : 0.5,
-                            cursor: unsavedStories[storyId] ? 'pointer' : 'default'
-                        }}
-                    >
-                        <Save size={16} /> Save
-                    </button>
-                )}
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    {activeTab === 'edit' && unsavedStories[storyId] && (
+                        <button
+                            onClick={handleDiscard}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                backgroundColor: 'var(--color-bg-secondary)',
+                                border: '1px solid var(--color-border)',
+                                color: 'var(--color-text)',
+                                padding: '0.5rem 1rem'
+                            }}
+                        >
+                            <RotateCcw size={16} /> Discard Changes
+                        </button>
+                    )}
+                    {activeTab === 'edit' && (
+                        <button
+                            onClick={handleSave}
+                            disabled={!unsavedStories[storyId]}
+                            style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.5rem',
+                                opacity: unsavedStories[storyId] ? 1 : 0.5,
+                                cursor: unsavedStories[storyId] ? 'pointer' : 'default'
+                            }}
+                        >
+                            <Save size={16} /> Save
+                        </button>
+                    )}
+                </div>
             </div>
 
             <div style={{ display: 'flex', borderBottom: '1px solid var(--color-border)', marginBottom: '1.5rem' }}>
@@ -754,6 +806,7 @@ const StoryView = ({ storyId }) => {
                             currentVersionId={story.currentVersionId}
                             selectedVersionId={selectedVersionId}
                             onSelect={handleVersionSelect}
+                            draft={drafts[storyId]}
                         />
                     </div>
 
