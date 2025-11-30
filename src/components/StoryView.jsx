@@ -4,6 +4,7 @@ import { Sparkles, Save, GitBranch, Scissors, RotateCcw, Edit } from 'lucide-rea
 import { improveStory, generateClarifyingQuestions, splitStory } from '../services/ai';
 import ContentContainer from './ContentContainer';
 import VersionGraph from './VersionGraph';
+import CopyControl from './CopyControl';
 
 const StoryView = ({ storyId }) => {
     const { stories, saveStory, restoreVersion, settings, updateVersion, projects, addStory, deleteStory, unsavedStories, setStoryUnsaved, drafts, saveDraft, discardDraft, triggerVersionTitleGeneration } = useStore();
@@ -545,7 +546,10 @@ const StoryView = ({ storyId }) => {
                         </div>
                     </div>
                     <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Title</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <label style={{ fontWeight: '500', margin: 0 }}>Title</label>
+                            <CopyControl text={formData.title} />
+                        </div>
                         <input
                             type="text"
                             name="title"
@@ -556,7 +560,10 @@ const StoryView = ({ storyId }) => {
                     </div>
 
                     <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Description</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <label style={{ fontWeight: '500', margin: 0 }}>Description</label>
+                            <CopyControl text={formData.description} />
+                        </div>
                         <textarea
                             name="description"
                             value={formData.description}
@@ -567,7 +574,10 @@ const StoryView = ({ storyId }) => {
                     </div>
 
                     <div style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>Acceptance Criteria</label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                            <label style={{ fontWeight: '500', margin: 0 }}>Acceptance Criteria</label>
+                            <CopyControl text={formData.acceptanceCriteria} />
+                        </div>
                         <textarea
                             name="acceptanceCriteria"
                             value={formData.acceptanceCriteria}

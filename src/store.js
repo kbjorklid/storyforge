@@ -309,6 +309,28 @@ const createContentSlice = (set) => ({
                 currentVersionId = rootVersionId;
             }
 
+            // Check for identical content
+            if (currentVersionId && versions[currentVersionId]) {
+                const currentVersion = versions[currentVersionId];
+                if (
+                    currentVersion.title === content.title &&
+                    currentVersion.description === content.description &&
+                    currentVersion.acceptanceCriteria === content.acceptanceCriteria
+                ) {
+                    // Content is identical, do not create a new version
+                    // But still clear unsaved/draft states as we are "saved"
+                    const newUnsaved = { ...state.unsavedStories };
+                    delete newUnsaved[id];
+                    const newDrafts = { ...state.drafts };
+                    delete newDrafts[id];
+
+                    return {
+                        unsavedStories: newUnsaved,
+                        drafts: newDrafts
+                    };
+                }
+            }
+
             newVersionId = uuidv4();
             const newVersion = {
                 id: newVersionId,
