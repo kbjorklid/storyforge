@@ -398,7 +398,68 @@ export const generateSubfolderName = async (story, settings) => {
     }
 };
 
-export const chatWithStories = async (stories, messages, settings, projectSettings = {}) => {
+const callOpenRouterStreaming = async (openRouterKey, model, messages, onChunk) => {
+    if (!openRouterKey) {
+        throw new Error('OpenRouter API Key is missing');
+    }
+
+    try {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${openRouterKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'http://localhost:5173',
+                'X-Title': 'StoryForge',
+            },
+            body: JSON.stringify({
+                model,
+                messages,
+                stream: true
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error?.message || 'Failed to fetch from OpenRouter');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                    const data = line.slice(6);
+                    if (data === '[DONE]') continue;
+
+                    try {
+                        const parsed = JSON.parse(data);
+                        const content = parsed.choices[0]?.delta?.content || '';
+                        if (content) {
+                            onChunk(content);
+                        }
+                    } catch (e) {
+                        console.error('Error parsing stream data:', e);
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('AI Service Error (Streaming):', error);
+        throw error;
+    }
+};
+
+export const chatWithStories = async (stories, messages, settings, projectSettings = {}, onChunk = null) => {
     const { openRouterKey, largeModel } = settings;
     const { context, systemPrompt } = projectSettings;
 
@@ -422,6 +483,8 @@ export const chatWithStories = async (stories, messages, settings, projectSettin
     Answer the user's questions based on these stories.
     If the user asks for suggestions, provide them based on Agile best practices and the content of the stories.
     If the user asks about something not related to these stories, you can answer generally but try to tie it back to the project context if possible.
+    
+    IMPORTANT: When using lists, ensure proper markdown nesting. If you have bullet points under a numbered list item, indent them by 4 spaces so they are rendered as nested lists.
     `;
 
     if (systemPrompt) {
@@ -436,6 +499,14 @@ export const chatWithStories = async (stories, messages, settings, projectSettin
     const apiMessages = messages.filter(m => m.role !== 'system');
 
     try {
+        if (onChunk) {
+            await callOpenRouterStreaming(openRouterKey, largeModel, [
+                { role: 'system', content: systemInstructions },
+                ...apiMessages
+            ], onChunk);
+            return;
+        }
+
         const content = await callOpenRouter(openRouterKey, largeModel, [
             { role: 'system', content: systemInstructions },
             ...apiMessages

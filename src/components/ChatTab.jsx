@@ -59,17 +59,38 @@ const ChatTab = ({ projectId }) => {
 
         try {
             const selectedStories = selectedStoryIds.map(id => stories[id]);
-            const response = await chatWithStories(
+
+            // Add placeholder for assistant message
+            setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+
+            await chatWithStories(
                 selectedStories,
                 [...messages, userMessage], // Send full history including new message
                 settings,
-                project
+                project,
+                (chunk) => {
+                    setMessages(prev => {
+                        const newMessages = [...prev];
+                        const lastIndex = newMessages.length - 1;
+                        const lastMessage = { ...newMessages[lastIndex] };
+                        lastMessage.content += chunk;
+                        newMessages[lastIndex] = lastMessage;
+                        return newMessages;
+                    });
+                }
             );
-
-            setMessages(prev => [...prev, { role: 'assistant', content: response }]);
         } catch (error) {
             console.error("Chat error:", error);
-            setMessages(prev => [...prev, { role: 'assistant', content: "Sorry, I encountered an error while processing your request." }]);
+            setMessages(prev => {
+                const newMessages = [...prev];
+                const lastMessage = newMessages[newMessages.length - 1];
+                if (lastMessage.role === 'assistant') {
+                    lastMessage.content = "Sorry, I encountered an error while processing your request.";
+                } else {
+                    newMessages.push({ role: 'assistant', content: "Sorry, I encountered an error while processing your request." });
+                }
+                return newMessages;
+            });
         } finally {
             setIsLoading(false);
         }
@@ -153,7 +174,7 @@ const ChatTab = ({ projectId }) => {
                             )}
                         </div>
                     ))}
-                    {isLoading && (
+                    {isLoading && messages[messages.length - 1]?.role === 'assistant' && messages[messages.length - 1]?.content === '' && (
                         <div style={{ display: 'flex', gap: '0.75rem', alignSelf: 'flex-start' }}>
                             <div style={{
                                 width: '32px',
@@ -171,9 +192,14 @@ const ChatTab = ({ projectId }) => {
                                 borderRadius: '8px',
                                 backgroundColor: 'var(--color-bg-secondary)',
                                 border: '1px solid var(--color-border)',
-                                color: 'var(--color-text-secondary)'
+                                color: 'var(--color-text-secondary)',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
                             }}>
-                                Thinking...
+                                <span className="dot-animation" style={{ animationDelay: '0s' }}>.</span>
+                                <span className="dot-animation" style={{ animationDelay: '0.2s' }}>.</span>
+                                <span className="dot-animation" style={{ animationDelay: '0.4s' }}>.</span>
                             </div>
                         </div>
                     )}
