@@ -7,8 +7,31 @@ const SettingsView = () => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        updateSettings({ [name]: value });
+
+        if (name === 'largeModel' || name === 'smallModel') {
+            // Update model for current provider
+            const currentProvider = settings.aiProvider || 'openrouter';
+            const currentProviderSettings = settings.providerSettings?.[currentProvider] || {};
+
+            updateSettings({
+                providerSettings: {
+                    ...settings.providerSettings,
+                    [currentProvider]: {
+                        ...currentProviderSettings,
+                        [name]: value
+                    }
+                }
+            });
+        } else {
+            updateSettings({ [name]: value });
+        }
     };
+
+    // Helper to get current model values safely
+    const currentProvider = settings.aiProvider || 'openrouter';
+    const currentModels = settings.providerSettings?.[currentProvider] || {};
+    const largeModelValue = currentModels.largeModel || '';
+    const smallModelValue = currentModels.smallModel || '';
 
     return (
         <ContentContainer maxWidth="600px">
@@ -17,22 +40,53 @@ const SettingsView = () => {
             <div style={{ marginBottom: '2rem' }}>
                 <h3 style={{ marginBottom: '1rem', fontSize: '1.1rem' }}>AI Configuration</h3>
                 <p style={{ marginBottom: '1rem', color: 'var(--color-text-secondary)', fontSize: '0.9rem' }}>
-                    StoryForge uses OpenRouter to access AI models. You need to provide your own API key.
+                    StoryForge uses external AI providers. You need to provide your own API key.
                 </p>
 
                 <div style={{ marginBottom: '1.5rem' }}>
                     <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
-                        OpenRouter API Key
+                        AI Provider
                     </label>
-                    <input
-                        type="password"
-                        name="openRouterKey"
-                        value={settings.openRouterKey}
+                    <select
+                        name="aiProvider"
+                        value={settings.aiProvider || 'openrouter'}
                         onChange={handleChange}
-                        placeholder="sk-or-..."
-                        style={{ width: '100%' }}
-                    />
+                        style={{ width: '100%', padding: '0.5rem' }}
+                    >
+                        <option value="openrouter">OpenRouter</option>
+                        <option value="anthropic">Anthropic</option>
+                    </select>
                 </div>
+
+                {settings.aiProvider === 'anthropic' ? (
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                            Anthropic API Key
+                        </label>
+                        <input
+                            type="password"
+                            name="anthropicKey"
+                            value={settings.anthropicKey || ''}
+                            onChange={handleChange}
+                            placeholder="sk-ant-..."
+                            style={{ width: '100%' }}
+                        />
+                    </div>
+                ) : (
+                    <div style={{ marginBottom: '1.5rem' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
+                            OpenRouter API Key
+                        </label>
+                        <input
+                            type="password"
+                            name="openRouterKey"
+                            value={settings.openRouterKey || ''}
+                            onChange={handleChange}
+                            placeholder="sk-or-..."
+                            style={{ width: '100%' }}
+                        />
+                    </div>
+                )}
 
                 <div style={{ marginBottom: '1.5rem' }}>
                     <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500' }}>
@@ -41,9 +95,9 @@ const SettingsView = () => {
                     <input
                         type="text"
                         name="largeModel"
-                        value={settings.largeModel}
+                        value={largeModelValue}
                         onChange={handleChange}
-                        placeholder="anthropic/claude-3.5-sonnet"
+                        placeholder={currentProvider === 'anthropic' ? "claude-3-5-sonnet-20240620" : "anthropic/claude-3.5-sonnet"}
                         style={{ width: '100%' }}
                     />
                     <p style={{ marginTop: '0.25rem', fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
@@ -58,9 +112,9 @@ const SettingsView = () => {
                     <input
                         type="text"
                         name="smallModel"
-                        value={settings.smallModel}
+                        value={smallModelValue}
                         onChange={handleChange}
-                        placeholder="google/gemini-flash-1.5"
+                        placeholder={currentProvider === 'anthropic' ? "claude-3-haiku-20240307" : "google/gemini-flash-1.5"}
                         style={{ width: '100%' }}
                     />
                     <p style={{ marginTop: '0.25rem', fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>

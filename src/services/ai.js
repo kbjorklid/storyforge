@@ -27,8 +27,63 @@ const callOpenRouter = async (openRouterKey, model, messages, responseFormat = {
         const data = await response.json();
         return data.choices[0].message.content;
     } catch (error) {
-        console.error('AI Service Error:', error);
+        console.error('AI Service Error (OpenRouter):', error);
         throw error;
+    }
+};
+
+const callAnthropic = async (anthropicKey, model, messages, responseFormat = null) => {
+    if (!anthropicKey) {
+        throw new Error('Anthropic API Key is missing');
+    }
+
+    // Anthropic API requires system message to be separate
+    let systemMessage = '';
+    const apiMessages = messages.filter(m => {
+        if (m.role === 'system') {
+            systemMessage += m.content + '\n\n';
+            return false;
+        }
+        return true;
+    });
+
+    try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'x-api-key': anthropicKey,
+                'anthropic-version': '2023-06-01',
+                'content-type': 'application/json',
+                'anthropic-dangerous-direct-browser-access': 'true'
+            },
+            body: JSON.stringify({
+                model,
+                messages: apiMessages,
+                system: systemMessage.trim(),
+                max_tokens: 4096,
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error?.message || 'Failed to fetch from Anthropic');
+        }
+
+        const data = await response.json();
+        return data.content[0].text;
+    } catch (error) {
+        console.error('AI Service Error (Anthropic):', error);
+        throw error;
+    }
+};
+
+const callAI = async (settings, model, messages, responseFormat = { type: 'json_object' }) => {
+    const { aiProvider, openRouterKey, anthropicKey } = settings;
+
+    if (aiProvider === 'anthropic') {
+        return callAnthropic(anthropicKey, model, messages, responseFormat);
+    } else {
+        return callOpenRouter(openRouterKey, model, messages, responseFormat);
     }
 };
 
@@ -43,8 +98,26 @@ const ensureString = (content) => {
     return String(content || '');
 };
 
+const getModels = (settings) => {
+    const provider = settings.aiProvider || 'openrouter';
+    const providerSettings = settings.providerSettings?.[provider] || {};
+
+    // Fallback for legacy settings if providerSettings is missing (though store update should handle this)
+    if (!settings.providerSettings) {
+        return {
+            largeModel: settings.largeModel || 'openai/gpt-5-mini',
+            smallModel: settings.smallModel || 'google/gemini-2.5-flash-lite'
+        };
+    }
+
+    return {
+        largeModel: providerSettings.largeModel,
+        smallModel: providerSettings.smallModel
+    };
+};
+
 export const improveStory = async (story, settings, projectSettings = {}, qaContext = null, rewriteSelection = null) => {
-    const { openRouterKey, largeModel, smallModel } = settings;
+    const { largeModel, smallModel } = getModels(settings);
     const { context, systemPrompt } = projectSettings;
 
     // Determine which model to use based on selection
@@ -110,7 +183,7 @@ export const improveStory = async (story, settings, projectSettings = {}, qaCont
         userPrompt = `Project Context:\n${context}\n\n` + userPrompt;
     }
 
-    const content = await callOpenRouter(openRouterKey, modelToUse, [
+    const content = await callAI(settings, modelToUse, [
         { role: 'system', content: systemInstructions },
         { role: 'user', content: userPrompt }
     ]);
@@ -138,7 +211,7 @@ export const improveStory = async (story, settings, projectSettings = {}, qaCont
 };
 
 export const generateClarifyingQuestions = async (story, settings, projectSettings = {}, type = 'improve') => {
-    const { openRouterKey, largeModel } = settings;
+    const { largeModel } = getModels(settings);
     const { context, systemPrompt } = projectSettings;
 
     let systemInstructions = '';
@@ -226,7 +299,7 @@ export const generateClarifyingQuestions = async (story, settings, projectSettin
         userPrompt = `Project Context:\n${context}\n\n` + userPrompt;
     }
 
-    const content = await callOpenRouter(openRouterKey, largeModel, [
+    const content = await callAI(settings, largeModel, [
         { role: 'system', content: systemInstructions },
         { role: 'user', content: userPrompt }
     ]);
@@ -251,10 +324,13 @@ export const generateClarifyingQuestions = async (story, settings, projectSettin
 };
 
 export const generateVersionChangeDescription = async (oldVersion, newVersion, settings) => {
-    const { openRouterKey, smallModel } = settings;
+    const { smallModel } = getModels(settings);
 
-    if (!openRouterKey) {
-        console.warn('OpenRouter API Key is missing, skipping version description generation');
+    const { aiProvider, openRouterKey, anthropicKey } = settings;
+    const hasKey = aiProvider === 'anthropic' ? !!anthropicKey : !!openRouterKey;
+
+    if (!hasKey) {
+        console.warn('AI API Key is missing, skipping version description generation');
         return null;
     }
 
@@ -279,7 +355,7 @@ export const generateVersionChangeDescription = async (oldVersion, newVersion, s
     `;
 
     try {
-        const content = await callOpenRouter(openRouterKey, smallModel, [
+        const content = await callAI(settings, smallModel, [
             { role: 'user', content: prompt }
         ]);
         return JSON.parse(content);
@@ -291,7 +367,7 @@ export const generateVersionChangeDescription = async (oldVersion, newVersion, s
 
 
 export const splitStory = async (story, settings, projectSettings = {}, userInstructions = '', qaContext = null) => {
-    const { openRouterKey, largeModel } = settings;
+    const { largeModel } = getModels(settings);
     const { context, systemPrompt } = projectSettings;
 
     let systemInstructions = `
@@ -335,7 +411,7 @@ export const splitStory = async (story, settings, projectSettings = {}, userInst
         userPrompt = `Project Context:\n${context}\n\n` + userPrompt;
     }
 
-    const content = await callOpenRouter(openRouterKey, largeModel, [
+    const content = await callAI(settings, largeModel, [
         { role: 'system', content: systemInstructions },
         { role: 'user', content: userPrompt }
     ]);
@@ -370,9 +446,12 @@ export const splitStory = async (story, settings, projectSettings = {}, userInst
 };
 
 export const generateSubfolderName = async (story, settings) => {
-    const { openRouterKey, smallModel } = settings;
+    const { smallModel } = getModels(settings);
 
-    if (!openRouterKey) {
+    const { aiProvider, openRouterKey, anthropicKey } = settings;
+    const hasKey = aiProvider === 'anthropic' ? !!anthropicKey : !!openRouterKey;
+
+    if (!hasKey) {
         return null;
     }
 
@@ -388,7 +467,7 @@ export const generateSubfolderName = async (story, settings) => {
     `;
 
     try {
-        const content = await callOpenRouter(openRouterKey, smallModel, [
+        const content = await callAI(settings, smallModel, [
             { role: 'user', content: prompt }
         ], { type: 'text' });
         return content.trim().replace(/['"]/g, '');
@@ -459,13 +538,96 @@ const callOpenRouterStreaming = async (openRouterKey, model, messages, onChunk) 
     }
 };
 
+const callAnthropicStreaming = async (anthropicKey, model, messages, onChunk) => {
+    if (!anthropicKey) {
+        throw new Error('Anthropic API Key is missing');
+    }
+
+    // Anthropic API requires system message to be separate
+    let systemMessage = '';
+    const apiMessages = messages.filter(m => {
+        if (m.role === 'system') {
+            systemMessage += m.content + '\n\n';
+            return false;
+        }
+        return true;
+    });
+
+    try {
+        const response = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+                'x-api-key': anthropicKey,
+                'anthropic-version': '2023-06-01',
+                'content-type': 'application/json',
+                'anthropic-dangerous-direct-browser-access': 'true'
+            },
+            body: JSON.stringify({
+                model,
+                messages: apiMessages,
+                system: systemMessage.trim(),
+                max_tokens: 4096,
+                stream: true
+            })
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error?.message || 'Failed to fetch from Anthropic');
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop();
+
+            for (const line of lines) {
+                if (line.startsWith('event: ')) {
+                    // Anthropic SSE format:
+                    // event: content_block_delta
+                    // data: {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "Hello"}}
+                    // ...
+                } else if (line.startsWith('data: ')) {
+                    const data = line.slice(6);
+                    try {
+                        const parsed = JSON.parse(data);
+                        if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                            onChunk(parsed.delta.text);
+                        }
+                    } catch (e) {
+                        // console.error('Error parsing stream data:', e);
+                    }
+                }
+            }
+        }
+    } catch (error) {
+        console.error('AI Service Error (Anthropic Streaming):', error);
+        throw error;
+    }
+};
+
+const callAIStreaming = async (settings, model, messages, onChunk) => {
+    const { aiProvider, openRouterKey, anthropicKey } = settings;
+
+    if (aiProvider === 'anthropic') {
+        return callAnthropicStreaming(anthropicKey, model, messages, onChunk);
+    } else {
+        return callOpenRouterStreaming(openRouterKey, model, messages, onChunk);
+    }
+};
+
 export const chatWithStories = async (stories, messages, settings, projectSettings = {}, onChunk = null, options = {}) => {
-    const { openRouterKey, largeModel } = settings;
+    const { largeModel } = getModels(settings);
     const { context, systemPrompt } = projectSettings;
 
-    if (!openRouterKey) {
-        throw new Error('OpenRouter API Key is missing');
-    }
+    // Key check is handled in callAI/callAIStreaming
 
     let systemInstructions = `
     You are a helpful assistant and expert Product Owner/Business Analyst.
@@ -516,14 +678,14 @@ export const chatWithStories = async (stories, messages, settings, projectSettin
 
     try {
         if (onChunk) {
-            await callOpenRouterStreaming(openRouterKey, largeModel, [
+            await callAIStreaming(settings, largeModel, [
                 { role: 'system', content: systemInstructions },
                 ...apiMessages
             ], onChunk);
             return;
         }
 
-        const content = await callOpenRouter(openRouterKey, largeModel, [
+        const content = await callAI(settings, largeModel, [
             { role: 'system', content: systemInstructions },
             ...apiMessages
         ], { type: 'text' }); // We expect text response, not JSON

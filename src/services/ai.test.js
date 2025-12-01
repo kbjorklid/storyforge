@@ -4,7 +4,12 @@ import { chatWithStories } from './ai';
 describe('chatWithStories', () => {
     const mockSettings = {
         openRouterKey: 'test-key',
-        largeModel: 'test-model'
+        aiProvider: 'openrouter',
+        providerSettings: {
+            openrouter: {
+                largeModel: 'test-model'
+            }
+        }
     };
 
     const mockStories = [

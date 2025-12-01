@@ -519,8 +519,18 @@ const createContentSlice = (set) => ({
 const createSettingsSlice = (set) => ({
     settings: {
         openRouterKey: '',
-        largeModel: 'openai/gpt-5-mini',
-        smallModel: 'google/gemini-2.5-flash-lite',
+        anthropicKey: '',
+        aiProvider: 'openrouter', // 'openrouter' or 'anthropic'
+        providerSettings: {
+            openrouter: {
+                largeModel: 'openai/gpt-5-mini',
+                smallModel: 'google/gemini-2.5-flash-lite',
+            },
+            anthropic: {
+                largeModel: 'claude-3-5-sonnet-20240620',
+                smallModel: 'claude-3-haiku-20240307',
+            }
+        }
     },
     updateSettings: (updates) => set((state) => ({
         settings: { ...state.settings, ...updates },
