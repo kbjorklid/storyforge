@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useStore } from '../store';
 import CheckboxFolderTree from './CheckboxFolderTree';
-import { MessageSquare, Send, ArrowLeft, Bot, User } from 'lucide-react';
+import { MessageSquare, Send, ArrowLeft, Bot, User, RotateCcw } from 'lucide-react';
 import { chatWithStories } from '../services/ai';
 import ReactMarkdown from 'react-markdown';
 
@@ -18,6 +18,7 @@ const ChatTab = ({ projectId, initialStoryId = null, autoStart = false }) => {
     const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [verbosity, setVerbosity] = useState('succinct');
     const messagesEndRef = useRef(null);
 
     const scrollToBottom = () => {
@@ -68,6 +69,15 @@ const ChatTab = ({ projectId, initialStoryId = null, autoStart = false }) => {
         ]);
     };
 
+    const handleReset = () => {
+        setMessages([
+            {
+                role: 'assistant',
+                content: `I'm ready to chat about the ${selectedStoryIds.length} stories you selected. What would you like to know?`
+            }
+        ]);
+    };
+
     const handleSendMessage = async () => {
         if (!input.trim() || isLoading) return;
 
@@ -96,7 +106,8 @@ const ChatTab = ({ projectId, initialStoryId = null, autoStart = false }) => {
                         newMessages[lastIndex] = lastMessage;
                         return newMessages;
                     });
-                }
+                },
+                { verbosity }
             );
         } catch (error) {
             console.error("Chat error:", error);
@@ -143,9 +154,45 @@ const ChatTab = ({ projectId, initialStoryId = null, autoStart = false }) => {
                             <ArrowLeft size={16} /> Back to Selection
                         </button>
                     )}
-                    <h3 style={{ margin: 0, fontSize: '1rem' }}>
+                    <h3 style={{ margin: 0, fontSize: '1rem', flex: 1 }}>
                         {initialStoryId ? 'Chatting about this story' : `Chatting about ${selectedStoryIds.length} stories`}
                     </h3>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <select
+                            value={verbosity}
+                            onChange={(e) => setVerbosity(e.target.value)}
+                            style={{
+                                padding: '0.25rem 0.5rem',
+                                borderRadius: '4px',
+                                border: '1px solid var(--color-border)',
+                                backgroundColor: 'var(--color-bg-primary)',
+                                color: 'var(--color-text-primary)',
+                                fontSize: '0.85rem'
+                            }}
+                        >
+                            <option value="normal">Normal</option>
+                            <option value="succinct">Succinct</option>
+                            <option value="very_succinct">Very Succinct</option>
+                        </select>
+
+                        <button
+                            onClick={handleReset}
+                            title="Reset Chat"
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                color: 'var(--color-text-secondary)',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '0.25rem'
+                            }}
+                        >
+                            <RotateCcw size={16} />
+                        </button>
+                    </div>
                 </div>
 
                 <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>

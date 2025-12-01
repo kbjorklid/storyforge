@@ -459,7 +459,7 @@ const callOpenRouterStreaming = async (openRouterKey, model, messages, onChunk) 
     }
 };
 
-export const chatWithStories = async (stories, messages, settings, projectSettings = {}, onChunk = null) => {
+export const chatWithStories = async (stories, messages, settings, projectSettings = {}, onChunk = null, options = {}) => {
     const { openRouterKey, largeModel } = settings;
     const { context, systemPrompt } = projectSettings;
 
@@ -503,6 +503,12 @@ export const chatWithStories = async (stories, messages, settings, projectSettin
 
     if (context) {
         systemInstructions += `\n\nProject Context:\n${context}`;
+    }
+
+    if (options.verbosity === 'succinct') {
+        systemInstructions += `\n\nBe succinct.`;
+    } else if (options.verbosity === 'very_succinct') {
+        systemInstructions += `\n\nBe very succinct.`;
     }
 
     // Filter out the local-only system message we added in the UI
