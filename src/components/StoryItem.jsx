@@ -57,7 +57,7 @@ const StoryItem = ({ storyId, onSelectStory, selectedStoryId, marginLeft = '24px
                 padding: '0.35rem 0.5rem',
                 display: 'flex',
                 alignItems: 'center',
-                cursor: 'grab',
+                cursor: 'pointer',
                 borderRadius: '6px',
                 fontSize: '0.85rem',
                 color: selectedStoryId === storyId ? 'var(--color-text-primary)' : 'var(--color-text-secondary)',

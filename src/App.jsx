@@ -7,7 +7,7 @@ import StoryView from './components/StoryView';
 import { useStore } from './store';
 
 function App() {
-  const { currentProjectId, setCurrentProject } = useStore();
+  const { currentProjectId, setCurrentProject, stories, folders, projects } = useStore();
   const [selectedStoryId, setSelectedStoryId] = useState(null);
 
   const handleProjectSelect = (projectId) => {
@@ -15,17 +15,34 @@ function App() {
     setSelectedStoryId(null);
   };
 
-  const renderContent = () => {
-    if (currentProjectId === 'settings') {
-      return <SettingsView />;
-    }
+  const handleStorySelect = (storyId) => {
+    setSelectedStoryId(storyId);
 
+    // Also switch to the project containing this story
+    if (storyId && stories[storyId]) {
+      const story = stories[storyId];
+      const parentFolder = folders[story.parentId];
+      if (parentFolder) {
+        // If parent is a root folder, it has projectId directly. 
+        // If it's a subfolder, we need to traverse up or check if subfolders have projectId (they do in this codebase)
+        if (parentFolder.projectId) {
+          setCurrentProject(parentFolder.projectId);
+        }
+      }
+    }
+  };
+
+  const renderContent = () => {
     if (selectedStoryId) {
       return <StoryView storyId={selectedStoryId} onBack={() => setSelectedStoryId(null)} />;
     }
 
+    if (currentProjectId === 'settings') {
+      return <SettingsView />;
+    }
+
     if (currentProjectId) {
-      return <ProjectView projectId={currentProjectId} onSelectStory={setSelectedStoryId} />;
+      return <ProjectView projectId={currentProjectId} onSelectStory={handleStorySelect} />;
     }
 
     return (
@@ -40,7 +57,7 @@ function App() {
     <Layout>
       <div style={{ display: 'flex', height: '100%', width: '100%' }}>
         <Sidebar
-          onSelectStory={setSelectedStoryId}
+          onSelectStory={handleStorySelect}
           selectedStoryId={selectedStoryId}
           onSelectProject={handleProjectSelect}
         />
