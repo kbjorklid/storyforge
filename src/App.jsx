@@ -9,14 +9,28 @@ import { useStore } from './store';
 function App() {
   const { currentProjectId, setCurrentProject, stories, folders, projects } = useStore();
   const [selectedStoryId, setSelectedStoryId] = useState(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const handleProjectSelect = (projectId) => {
+    if (hasUnsavedChanges) {
+      if (!window.confirm('You have unsaved changes in the current story. Are you sure you want to leave? Your changes will be lost.')) {
+        return;
+      }
+    }
     setCurrentProject(projectId);
     setSelectedStoryId(null);
+    setHasUnsavedChanges(false);
   };
 
   const handleStorySelect = (storyId) => {
+    if (hasUnsavedChanges) {
+      if (!window.confirm('You have unsaved changes in the current story. Are you sure you want to leave? Your changes will be lost.')) {
+        return;
+      }
+    }
+
     setSelectedStoryId(storyId);
+    setHasUnsavedChanges(false);
 
     // Also switch to the project containing this story
     if (storyId && stories[storyId]) {
@@ -34,7 +48,7 @@ function App() {
 
   const renderContent = () => {
     if (selectedStoryId) {
-      return <StoryView storyId={selectedStoryId} onBack={() => setSelectedStoryId(null)} />;
+      return <StoryView storyId={selectedStoryId} onBack={() => setSelectedStoryId(null)} setHasUnsavedChanges={setHasUnsavedChanges} />;
     }
 
     if (currentProjectId === 'settings') {

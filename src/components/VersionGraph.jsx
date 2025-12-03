@@ -201,7 +201,7 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect,
             .attr("r", d => (d.data.id === currentVersionIdRef.current || d.data.id === selectedVersionIdRef.current) ? 10 : 6);
 
         // Labels
-        node.append("text")
+        const textNode = node.append("text")
             .attr("transform", "rotate(45)")
             .attr("x", 14)
             .attr("dy", ".35em")
@@ -215,13 +215,23 @@ const VersionGraph = ({ versions, currentVersionId, selectedVersionId, onSelect,
             .text(d => {
                 if (d.data.id === 'draft') return "Draft";
                 if (d.data.changeTitle) {
-                    return d.data.changeTitle.length > 20
-                        ? d.data.changeTitle.substring(0, 20) + '...'
+                    return d.data.changeTitle.length > 25
+                        ? d.data.changeTitle.substring(0, 25) + '...'
                         : d.data.changeTitle;
                 }
                 return new Date(d.data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            })
-            .transition()
+            });
+
+        // Add tooltip to the entire node group (circle + text)
+        node.append("title")
+            .text(d => {
+                if (d.data.changeTitle) {
+                    return `${d.data.changeTitle}${d.data.changeDescription ? '\n\n' + d.data.changeDescription : ''}`;
+                }
+                return "";
+            });
+
+        textNode.transition()
             .duration(500)
             .delay((d, i) => i * 50 + 300)
             .style("opacity", 1);

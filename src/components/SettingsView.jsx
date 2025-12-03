@@ -121,6 +121,23 @@ const SettingsView = () => {
                         Used for simpler tasks.
                     </p>
                 </div>
+
+                <div style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center' }}>
+                    <input
+                        type="checkbox"
+                        id="aiDebug"
+                        name="aiDebug"
+                        checked={settings.aiDebug || false}
+                        onChange={(e) => updateSettings({ aiDebug: e.target.checked })}
+                        style={{ marginRight: '0.5rem' }}
+                    />
+                    <label htmlFor="aiDebug" style={{ fontWeight: '500', cursor: 'pointer' }}>
+                        AI Debug Mode
+                    </label>
+                </div>
+                <p style={{ marginTop: '-1rem', marginBottom: '1.5rem', marginLeft: '1.5rem', fontSize: '0.8rem', color: 'var(--color-text-secondary)' }}>
+                    When enabled, raw AI responses will be logged to the browser console.
+                </p>
             </div>
         </ContentContainer>
     );

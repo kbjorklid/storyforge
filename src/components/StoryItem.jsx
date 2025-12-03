@@ -30,6 +30,9 @@ const StoryItem = ({ storyId, onSelectStory, selectedStoryId, marginLeft = '24px
                 duplicateStory(id);
                 break;
             case 'delete-story':
+                if (selectedStoryId === id) {
+                    onSelectStory(null);
+                }
                 deleteStory(id);
                 showToast('Story deleted', 'success', {
                     label: 'Undo',
@@ -48,7 +51,6 @@ const StoryItem = ({ storyId, onSelectStory, selectedStoryId, marginLeft = '24px
 
     return (
         <motion.div
-            layout
             onClick={() => onSelectStory(storyId)}
             draggable
             onDragStart={(e) => handleDragStart(e, storyId)}

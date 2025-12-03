@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import { Settings, Plus, Folder, Trash2, ChevronDown, ChevronRight, MoreVertical, FileText, Edit2 } from 'lucide-react';
+import { Settings, Plus, Folder, Trash2, ChevronDown, ChevronRight, MoreVertical, FileText, Edit2, Bug } from 'lucide-react';
 import FolderTree from './FolderTree';
 import Menu from './Menu';
 import ThemeToggle from './ThemeToggle';
+import AIDebugModal from './AIDebugModal';
 
 const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
-    const { projects, currentProjectId, addProject, deleteProject, addFolder, addStory, moveStory, moveFolder, updateProject } = useStore();
+    const { projects, currentProjectId, addProject, deleteProject, addFolder, addStory, moveStory, moveFolder, updateProject, settings } = useStore();
     const [isCreating, setIsCreating] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
     const [expandedProjectIds, setExpandedProjectIds] = useState(new Set());
@@ -14,6 +15,7 @@ const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
     const [isResizing, setIsResizing] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [activeMenu, setActiveMenu] = useState(null); // { id: string, type: 'project', position: { x, y } }
+    const [showDebugModal, setShowDebugModal] = useState(false);
     const sidebarRef = React.useRef(null);
 
     // Expand current project when selected
@@ -314,6 +316,27 @@ const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
             </div>
 
             <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
+                {settings?.aiDebug && (
+                    <button
+                        onClick={() => setShowDebugModal(true)}
+                        style={{
+                            width: '100%',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            backgroundColor: 'transparent',
+                            justifyContent: 'flex-start',
+                            padding: '0.5rem',
+                            borderRadius: '4px',
+                            color: 'var(--color-text-secondary)',
+                            marginBottom: '0.5rem'
+                        }}
+                        title="AI Debug History"
+                    >
+                        <Bug size={16} />
+                        AI History
+                    </button>
+                )}
                 <button
                     onClick={() => onSelectProject('settings')}
                     style={{
@@ -332,6 +355,7 @@ const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
                     Settings
                 </button>
             </div>
+            {showDebugModal && <AIDebugModal onClose={() => setShowDebugModal(false)} />}
         </aside>
     );
 };

@@ -68,14 +68,13 @@ const createStoryObject = (parentId, title, description, acceptanceCriteria, aut
     return { newStoryId, newStory };
 };
 
-const createContentSlice = (set) => ({
+const createContentSlice = (set, get) => ({
     folders: {}, // Record<string, Folder>
     stories: {}, // Record<string, Story>
     drafts: {}, // Record<string, { content: StoryContent, timestamp: string, baseVersionId: string }>
 
     triggerVersionTitleGeneration: (storyId, versionId, oldVersion, newVersion) => {
         const settings = get().settings;
-        if (!settings.openRouterKey) return;
 
         generateVersionChangeDescription(oldVersion, newVersion, settings).then(result => {
             if (result) {
@@ -521,6 +520,7 @@ const createSettingsSlice = (set) => ({
         openRouterKey: '',
         anthropicKey: '',
         aiProvider: 'openrouter', // 'openrouter' or 'anthropic'
+        aiDebug: false,
         providerSettings: {
             openrouter: {
                 largeModel: 'openai/gpt-5-mini',

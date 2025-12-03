@@ -1,4 +1,19 @@
-const callOpenRouter = async (openRouterKey, model, messages, responseFormat = { type: 'json_object' }) => {
+let aiHistory = [];
+
+export const getAIHistory = () => aiHistory;
+export const clearAIHistory = () => { aiHistory = []; };
+
+const addToHistory = (type, content) => {
+    aiHistory.push({
+        id: Date.now() + Math.random(),
+        timestamp: new Date().toISOString(),
+        type,
+        content
+    });
+    if (aiHistory.length > 50) aiHistory.shift();
+};
+
+const callOpenRouter = async (openRouterKey, model, messages, responseFormat = { type: 'json_object' }, debug = false) => {
     if (!openRouterKey) {
         throw new Error('OpenRouter API Key is missing');
     }
@@ -19,20 +34,33 @@ const callOpenRouter = async (openRouterKey, model, messages, responseFormat = {
             })
         });
 
+        addToHistory('input', JSON.stringify({
+            model,
+            messages,
+            response_format: responseFormat
+        }, null, 2));
+
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error?.message || 'Failed to fetch from OpenRouter');
         }
 
         const data = await response.json();
-        return data.choices[0].message.content;
+        const content = data.choices[0].message.content;
+
+        if (debug) {
+            console.log('AI Debug (OpenRouter):', content);
+        }
+        addToHistory('output', content);
+
+        return content;
     } catch (error) {
         console.error('AI Service Error (OpenRouter):', error);
         throw error;
     }
 };
 
-const callAnthropic = async (anthropicKey, model, messages, responseFormat = null) => {
+const callAnthropic = async (anthropicKey, model, messages, responseFormat = null, debug = false) => {
     if (!anthropicKey) {
         throw new Error('Anthropic API Key is missing');
     }
@@ -64,26 +92,40 @@ const callAnthropic = async (anthropicKey, model, messages, responseFormat = nul
             })
         });
 
+        addToHistory('input', JSON.stringify({
+            model,
+            messages: apiMessages,
+            system: systemMessage.trim(),
+            max_tokens: 4096,
+        }, null, 2));
+
         if (!response.ok) {
             const errorData = await response.json();
             throw new Error(errorData.error?.message || 'Failed to fetch from Anthropic');
         }
 
         const data = await response.json();
-        return data.content[0].text;
+        const content = data.content[0].text;
+
+        if (debug) {
+            console.log('AI Debug (Anthropic):', content);
+        }
+        addToHistory('output', content);
+
+        return content;
     } catch (error) {
         console.error('AI Service Error (Anthropic):', error);
         throw error;
     }
 };
 
-const callAI = async (settings, model, messages, responseFormat = { type: 'json_object' }) => {
+export const callAI = async (settings, model, messages, responseFormat = { type: 'json_object' }) => {
     const { aiProvider, openRouterKey, anthropicKey } = settings;
 
     if (aiProvider === 'anthropic') {
-        return callAnthropic(anthropicKey, model, messages, responseFormat);
+        return callAnthropic(anthropicKey, model, messages, responseFormat, settings.aiDebug);
     } else {
-        return callOpenRouter(openRouterKey, model, messages, responseFormat);
+        return callOpenRouter(openRouterKey, model, messages, responseFormat, settings.aiDebug);
     }
 };
 
@@ -263,6 +305,8 @@ export const generateClarifyingQuestions = async (story, settings, projectSettin
     - "single_select": For questions with mutually exclusive options (radio buttons).
     - "multi_select": For questions where multiple options can be selected (checkboxes).
     
+    If the provided options are not exhaustive, you may include an "Other" option as the last choice. This will allow the user to specify their own answer in a text field.
+    
     Return the result as a JSON object where each key is a unique identifier (e.g., "question1", "question2") and the value is the question object.
     
     Example JSON structure:
@@ -348,9 +392,11 @@ export const generateVersionChangeDescription = async (oldVersion, newVersion, s
     Description: ${newVersion.description}
     Acceptance Criteria: ${newVersion.acceptanceCriteria}
 
-    Provide a JSON object with two fields:
+    Provide a JSON object with EXACTLY these two fields and NO others:
     1. "changeTitle": A very short summary of the change (max 5 words).
-    2. "changeDescription": A concise description of what changed (max 2 sentences).
+    2. "changeDescription": A detailed description of what changed (max 50 words).
+    
+    Do NOT include any other fields or analysis.
     Do not include any markdown formatting around the JSON.
     `;
 
@@ -477,7 +523,7 @@ export const generateSubfolderName = async (story, settings) => {
     }
 };
 
-const callOpenRouterStreaming = async (openRouterKey, model, messages, onChunk) => {
+const callOpenRouterStreaming = async (openRouterKey, model, messages, onChunk, debug = false) => {
     if (!openRouterKey) {
         throw new Error('OpenRouter API Key is missing');
     }
@@ -524,6 +570,7 @@ const callOpenRouterStreaming = async (openRouterKey, model, messages, onChunk) 
                         const parsed = JSON.parse(data);
                         const content = parsed.choices[0]?.delta?.content || '';
                         if (content) {
+                            if (debug) console.log('AI Debug Stream (OpenRouter):', content);
                             onChunk(content);
                         }
                     } catch (e) {
@@ -538,7 +585,7 @@ const callOpenRouterStreaming = async (openRouterKey, model, messages, onChunk) 
     }
 };
 
-const callAnthropicStreaming = async (anthropicKey, model, messages, onChunk) => {
+const callAnthropicStreaming = async (anthropicKey, model, messages, onChunk, debug = false) => {
     if (!anthropicKey) {
         throw new Error('Anthropic API Key is missing');
     }
@@ -599,6 +646,7 @@ const callAnthropicStreaming = async (anthropicKey, model, messages, onChunk) =>
                     try {
                         const parsed = JSON.parse(data);
                         if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
+                            if (debug) console.log('AI Debug Stream (Anthropic):', parsed.delta.text);
                             onChunk(parsed.delta.text);
                         }
                     } catch (e) {
@@ -617,9 +665,9 @@ const callAIStreaming = async (settings, model, messages, onChunk) => {
     const { aiProvider, openRouterKey, anthropicKey } = settings;
 
     if (aiProvider === 'anthropic') {
-        return callAnthropicStreaming(anthropicKey, model, messages, onChunk);
+        return callAnthropicStreaming(anthropicKey, model, messages, onChunk, settings.aiDebug);
     } else {
-        return callOpenRouterStreaming(openRouterKey, model, messages, onChunk);
+        return callOpenRouterStreaming(openRouterKey, model, messages, onChunk, settings.aiDebug);
     }
 };
 

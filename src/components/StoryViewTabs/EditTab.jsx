@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { RotateCcw, Save } from 'lucide-react';
+import { RotateCcw, Save, Copy, Check } from 'lucide-react';
 import CopyControl from '../CopyControl';
 
 const EditTab = ({
@@ -12,6 +12,25 @@ const EditTab = ({
     unsavedStories,
     drafts
 }) => {
+    const [isCopied, setIsCopied] = React.useState(false);
+
+    const handleCopy = async () => {
+        const { title, description, acceptanceCriteria } = formData;
+        let textToCopy = `# ${title}\n\n${description}`;
+
+        if (acceptanceCriteria && acceptanceCriteria.trim()) {
+            textToCopy += `\n\n## Acceptance Criteria\n\n${acceptanceCriteria}`;
+        }
+
+        try {
+            await navigator.clipboard.writeText(textToCopy);
+            setIsCopied(true);
+            setTimeout(() => setIsCopied(false), 2000);
+        } catch (err) {
+            console.error('Failed to copy text: ', err);
+        }
+    };
+
     return (
         <motion.div
             key="edit"
@@ -30,6 +49,24 @@ const EditTab = ({
                     )}
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                        onClick={handleCopy}
+                        aria-label={isCopied ? "Copied to clipboard" : "Copy whole story"}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.5rem',
+                            backgroundColor: 'var(--color-bg-secondary)',
+                            border: '1px solid var(--color-border)',
+                            color: isCopied ? 'var(--color-success)' : 'var(--color-text)',
+                            padding: '0.5rem 1rem',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                        }}
+                    >
+                        {isCopied ? <Check size={16} /> : <Copy size={16} />}
+                        {isCopied ? 'Copied!' : 'Copy Story'}
+                    </button>
                     {unsavedStories[storyId] && (
                         <button
                             onClick={handleDiscard}
@@ -107,6 +144,9 @@ const EditTab = ({
                     rows={8}
                     style={{ width: '100%', resize: 'vertical' }}
                 />
+            </div>
+            <div aria-live="polite" style={{ position: 'absolute', width: '1px', height: '1px', padding: 0, margin: '-1px', overflow: 'hidden', clip: 'rect(0, 0, 0, 0)', whiteSpace: 'nowrap', border: 0 }}>
+                {isCopied ? 'Story copied to clipboard' : ''}
             </div>
         </motion.div>
     );

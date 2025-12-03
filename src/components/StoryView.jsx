@@ -12,7 +12,7 @@ import SplitTab from './StoryViewTabs/SplitTab';
 import VersionsTab from './StoryViewTabs/VersionsTab';
 import ChatTab from './ChatTab';
 
-const StoryView = ({ storyId }) => {
+const StoryView = ({ storyId, setHasUnsavedChanges }) => {
     const { stories, saveStory, restoreVersion, settings, updateVersion, projects, addStory, deleteStory, unsavedStories, setStoryUnsaved, drafts, saveDraft, discardDraft, triggerVersionTitleGeneration, addFolder } = useStore();
     const story = stories[storyId];
     // const project = projects.find(p => p.id === story?.parentId) || projects.find(p => p.rootFolderId === story?.parentId);
@@ -106,6 +106,34 @@ const StoryView = ({ storyId }) => {
 
         setStoryUnsaved(storyId, hasChanges);
     }, [formData, story, storyId, setStoryUnsaved]);
+
+    // Check for unsaved AI changes (Rewrite or Split)
+    useEffect(() => {
+        if (!setHasUnsavedChanges) return;
+
+        const hasUnsavedAIChanges =
+            (activeTab === 'rewrite' && (aiSuggestion || clarifyingQuestions)) ||
+            (activeTab === 'split' && (splitStories || splitClarifyingQuestions));
+
+        setHasUnsavedChanges(hasUnsavedAIChanges);
+
+        return () => setHasUnsavedChanges(false);
+    }, [activeTab, aiSuggestion, clarifyingQuestions, splitStories, splitClarifyingQuestions, setHasUnsavedChanges]);
+
+    // Reset state when story changes
+    useEffect(() => {
+        setActiveTab('edit');
+        setAiSuggestion(null);
+        setClarifyingQuestions(null);
+        setSplitStories(null);
+        setSplitClarifyingQuestions(null);
+        setAnswers({});
+        setSplitAnswers({});
+        setIsImproving(false);
+        setIsSplitting(false);
+        setError(null);
+        setIgnoredQuestions(new Set());
+    }, [storyId]);
 
     if (!story) return <div>Story not found</div>;
 
