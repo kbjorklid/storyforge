@@ -13,7 +13,7 @@ const addToHistory = (type, content) => {
     if (aiHistory.length > 50) aiHistory.shift();
 };
 
-const callOpenRouter = async (openRouterKey, model, messages, responseFormat = { type: 'json_object' }, debug = false) => {
+const callOpenRouter = async (openRouterKey, model, messages, responseFormat = { type: 'json_object' }, debug = false, signal = null) => {
     if (!openRouterKey) {
         throw new Error('OpenRouter API Key is missing');
     }
@@ -31,7 +31,8 @@ const callOpenRouter = async (openRouterKey, model, messages, responseFormat = {
                 model,
                 messages,
                 response_format: responseFormat
-            })
+            }),
+            signal
         });
 
         addToHistory('input', JSON.stringify({
@@ -60,7 +61,7 @@ const callOpenRouter = async (openRouterKey, model, messages, responseFormat = {
     }
 };
 
-const callAnthropic = async (anthropicKey, model, messages, responseFormat = null, debug = false) => {
+const callAnthropic = async (anthropicKey, model, messages, responseFormat = null, debug = false, signal = null) => {
     if (!anthropicKey) {
         throw new Error('Anthropic API Key is missing');
     }
@@ -89,7 +90,8 @@ const callAnthropic = async (anthropicKey, model, messages, responseFormat = nul
                 messages: apiMessages,
                 system: systemMessage.trim(),
                 max_tokens: 4096,
-            })
+            }),
+            signal
         });
 
         addToHistory('input', JSON.stringify({
@@ -119,13 +121,46 @@ const callAnthropic = async (anthropicKey, model, messages, responseFormat = nul
     }
 };
 
-export const callAI = async (settings, model, messages, responseFormat = { type: 'json_object' }) => {
+export const callAI = async (settings, model, messages, responseFormat = { type: 'json_object' }, signal = null) => {
     const { aiProvider, openRouterKey, anthropicKey } = settings;
 
     if (aiProvider === 'anthropic') {
-        return callAnthropic(anthropicKey, model, messages, responseFormat, settings.aiDebug);
+        return callAnthropic(anthropicKey, model, messages, responseFormat, settings.aiDebug, signal);
     } else {
-        return callOpenRouter(openRouterKey, model, messages, responseFormat, settings.aiDebug);
+        return callOpenRouter(openRouterKey, model, messages, responseFormat, settings.aiDebug, signal);
+    }
+};
+
+const parseAIJson = (content) => {
+    try {
+        // Find the first '{' or '['
+        const firstOpenBrace = content.indexOf('{');
+        const firstOpenBracket = content.indexOf('[');
+
+        let startIndex = -1;
+        let endIndex = -1;
+
+        // Determine if we should look for object or array
+        if (firstOpenBrace !== -1 && (firstOpenBracket === -1 || firstOpenBrace < firstOpenBracket)) {
+            startIndex = firstOpenBrace;
+            endIndex = content.lastIndexOf('}');
+        } else if (firstOpenBracket !== -1) {
+            startIndex = firstOpenBracket;
+            endIndex = content.lastIndexOf(']');
+        }
+
+        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+            const jsonString = content.substring(startIndex, endIndex + 1);
+            return JSON.parse(jsonString);
+        }
+    } catch (e) {
+        console.warn("Failed to parse extracted JSON, attempting to parse original content");
+    }
+
+    try {
+        return JSON.parse(content);
+    } catch (e) {
+        return content;
     }
 };
 
@@ -158,7 +193,7 @@ const getModels = (settings) => {
     };
 };
 
-export const improveStory = async (story, settings, projectSettings = {}, qaContext = null, rewriteSelection = null) => {
+export const improveStory = async (story, settings, projectSettings = {}, qaContext = null, rewriteSelection = null, signal = null) => {
     const { largeModel, smallModel } = getModels(settings);
     const { context, systemPrompt } = projectSettings;
 
@@ -228,9 +263,9 @@ export const improveStory = async (story, settings, projectSettings = {}, qaCont
     const content = await callAI(settings, modelToUse, [
         { role: 'system', content: systemInstructions },
         { role: 'user', content: userPrompt }
-    ]);
+    ], { type: 'json_object' }, signal);
 
-    let parsed = JSON.parse(content);
+    let parsed = parseAIJson(content);
 
     if (parsed.description) parsed.description = ensureString(parsed.description);
     if (parsed.acceptanceCriteria) parsed.acceptanceCriteria = ensureString(parsed.acceptanceCriteria);
@@ -252,7 +287,57 @@ export const improveStory = async (story, settings, projectSettings = {}, qaCont
     return result;
 };
 
-export const generateClarifyingQuestions = async (story, settings, projectSettings = {}, type = 'improve') => {
+export const generateStoryFromPrompt = async (prompt, settings, projectSettings = {}, qaContext = null) => {
+    const { largeModel } = getModels(settings);
+    const { context, systemPrompt } = projectSettings;
+
+    let systemInstructions = `
+    You are an expert Product Owner and Business Analyst.
+    Create a detailed user story based on the user's prompt.
+    
+    Return the result as a JSON object with keys: "title", "description", "acceptanceCriteria".
+    
+    The "description" and "acceptanceCriteria" fields MUST be strings (markdown is supported).
+    Do NOT return arrays or objects for these fields.
+    Do not include any markdown formatting around the JSON.
+    
+    Make the title concise and action-oriented.
+    Make the description clear, providing context and "who, what, why".
+    Make the acceptance criteria specific, measurable, achievable, relevant, and time-bound (SMART).
+    `;
+
+    if (systemPrompt) {
+        systemInstructions += `\n\nAdditional Instructions:\n${systemPrompt}`;
+    }
+
+    let userPrompt = `Prompt: ${prompt}`;
+
+    if (qaContext) {
+        userPrompt += `\n\nClarifying Questions and Answers:\n`;
+        qaContext.forEach((qa, index) => {
+            userPrompt += `Q${index + 1}: ${qa.question}\nA: ${qa.answer}\n`;
+        });
+        userPrompt += `\nPlease incorporate the information from these answers into the story.`;
+    }
+
+    if (context) {
+        userPrompt = `Project Context:\n${context}\n\n` + userPrompt;
+    }
+
+    const content = await callAI(settings, largeModel, [
+        { role: 'system', content: systemInstructions },
+        { role: 'user', content: userPrompt }
+    ]);
+
+    let parsed = parseAIJson(content);
+
+    if (parsed.description) parsed.description = ensureString(parsed.description);
+    if (parsed.acceptanceCriteria) parsed.acceptanceCriteria = ensureString(parsed.acceptanceCriteria);
+
+    return parsed;
+};
+
+export const generateClarifyingQuestions = async (story, settings, projectSettings = {}, type = 'improve', signal = null) => {
     const { largeModel } = getModels(settings);
     const { context, systemPrompt } = projectSettings;
 
@@ -292,6 +377,40 @@ export const generateClarifyingQuestions = async (story, settings, projectSettin
     }
     \`\`\`
     
+    Do not include any markdown formatting around the JSON.
+    `;
+    } else if (type === 'create') {
+        systemInstructions = `
+    You are an expert Product Owner and Business Analyst.
+    Review the following story request and identify ambiguities or missing details.
+    Generate 3-5 clarifying questions that would help create a high-quality user story.
+    
+    For each question, determine the best format:
+    - "text": For open-ended questions.
+    - "single_select": For questions with mutually exclusive options (radio buttons).
+    - "multi_select": For questions where multiple options can be selected (checkboxes).
+    
+    If the provided options are not exhaustive, you may include an "Other" option as the last choice. This will allow the user to specify their own answer in a text field.
+    
+    Return the result as a JSON object where each key is a unique identifier (e.g., "question1", "question2") and the value is the question object.
+    
+    Example JSON structure:
+    \`\`\`json
+    {
+        "question1": {
+            "id": "q1",
+            "text": "What is the primary goal of this story?",
+            "type": "text"
+        },
+        "question2": {
+            "id": "q2",
+            "text": "Who is the target audience?",
+            "type": "single_select",
+            "options": ["Admin", "User", "Guest"]
+        }
+    }
+    \`\`\`
+
     Do not include any markdown formatting around the JSON.
     `;
     } else {
@@ -334,10 +453,16 @@ export const generateClarifyingQuestions = async (story, settings, projectSettin
         systemInstructions += `\n\nAdditional Instructions:\n${systemPrompt}`;
     }
 
-    let userPrompt = `Current Story:
+    let userPrompt = '';
+
+    if (type === 'create') {
+        userPrompt = `Story Request: ${story.description}`;
+    } else {
+        userPrompt = `Current Story:
     Title: ${story.title}
     Description: ${story.description}
     Acceptance Criteria: ${story.acceptanceCriteria}`;
+    }
 
     if (context) {
         userPrompt = `Project Context:\n${context}\n\n` + userPrompt;
@@ -346,10 +471,10 @@ export const generateClarifyingQuestions = async (story, settings, projectSettin
     const content = await callAI(settings, largeModel, [
         { role: 'system', content: systemInstructions },
         { role: 'user', content: userPrompt }
-    ]);
+    ], { type: 'json_object' }, signal);
 
     // Handle case where AI might wrap the array in an object key like "questions"
-    let parsed = JSON.parse(content);
+    let parsed = parseAIJson(content);
     if (!Array.isArray(parsed) && parsed.questions && Array.isArray(parsed.questions)) {
         parsed = parsed.questions;
     } else if (!Array.isArray(parsed)) {
@@ -404,7 +529,7 @@ export const generateVersionChangeDescription = async (oldVersion, newVersion, s
         const content = await callAI(settings, smallModel, [
             { role: 'user', content: prompt }
         ]);
-        return JSON.parse(content);
+        return parseAIJson(content);
     } catch (error) {
         console.error('AI Service Error (Version Description):', error);
         return null;
@@ -412,7 +537,7 @@ export const generateVersionChangeDescription = async (oldVersion, newVersion, s
 };
 
 
-export const splitStory = async (story, settings, projectSettings = {}, userInstructions = '', qaContext = null) => {
+export const splitStory = async (story, settings, projectSettings = {}, userInstructions = '', qaContext = null, signal = null) => {
     const { largeModel } = getModels(settings);
     const { context, systemPrompt } = projectSettings;
 
@@ -460,9 +585,9 @@ export const splitStory = async (story, settings, projectSettings = {}, userInst
     const content = await callAI(settings, largeModel, [
         { role: 'system', content: systemInstructions },
         { role: 'user', content: userPrompt }
-    ]);
+    ], { type: 'json_object' }, signal);
 
-    let parsed = JSON.parse(content);
+    let parsed = parseAIJson(content);
 
     // Handle potential wrapping
     if (!Array.isArray(parsed) && parsed.stories && Array.isArray(parsed.stories)) {
@@ -491,7 +616,7 @@ export const splitStory = async (story, settings, projectSettings = {}, userInst
     }));
 };
 
-export const generateSubfolderName = async (story, settings) => {
+export const generateSubfolderName = async (story, settings, signal = null) => {
     const { smallModel } = getModels(settings);
 
     const { aiProvider, openRouterKey, anthropicKey } = settings;
@@ -515,7 +640,7 @@ export const generateSubfolderName = async (story, settings) => {
     try {
         const content = await callAI(settings, smallModel, [
             { role: 'user', content: prompt }
-        ], { type: 'text' });
+        ], { type: 'text' }, signal);
         return content.trim().replace(/['"]/g, '');
     } catch (error) {
         console.error('AI Service Error (Subfolder Name):', error);

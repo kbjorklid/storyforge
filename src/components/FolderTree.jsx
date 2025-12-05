@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import { Folder, FileText, ChevronRight, ChevronDown, Plus, Trash2, MoreVertical, Edit2, Copy } from 'lucide-react';
+import { Folder, FileText, ChevronRight, ChevronDown, Plus, Trash2, MoreVertical, Edit2, Copy, Sparkles } from 'lucide-react';
 import Menu from './Menu';
 import StoryItem from './StoryItem';
 
-const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searchTerm = '' }) => {
+const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searchTerm = '', onCreateStoryAI, hideDoneStories }) => {
     const { folders, stories, addFolder, addStory, moveStory, moveFolder, deleteFolder, updateFolder } = useStore();
     const folder = folders[folderId];
     const [isOpen, setIsOpen] = useState(true);
@@ -17,13 +17,16 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
     const filteredStories = folder ? folder.stories.filter(storyId => {
         const story = stories[storyId];
         if (!story || story.deleted) return false;
+        if (hideDoneStories && story.isDone) return false;
         if (!searchTerm) return true;
         return story.title.toLowerCase().includes(searchTerm.toLowerCase());
     }) : [];
 
     // Check if any children (subfolders) have matching content
     const hasMatchingChildren = React.useMemo(() => {
-        if (!folder || !searchTerm) return true;
+        if (!folder) return false;
+        // If searching, check for matches. If not searching but hiding done, check for visible content
+        if (!searchTerm && !hideDoneStories) return true;
 
         const checkFolder = (fId) => {
             const f = folders[fId];
@@ -32,7 +35,10 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
             // Check stories in this folder
             const hasMatchingStories = f.stories.some(sId => {
                 const s = stories[sId];
-                return s && !s.deleted && s.title.toLowerCase().includes(searchTerm.toLowerCase());
+                if (!s || s.deleted) return false;
+                if (hideDoneStories && s.isDone) return false;
+                if (!searchTerm) return true;
+                return s.title.toLowerCase().includes(searchTerm.toLowerCase());
             });
             if (hasMatchingStories) return true;
 
@@ -41,11 +47,11 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
         };
 
         return folder.children.some(childId => checkFolder(childId));
-    }, [folder, folders, stories, searchTerm]);
+    }, [folder, folders, stories, searchTerm, hideDoneStories]);
 
     // Determine visibility
     const hasMatches = filteredStories.length > 0 || hasMatchingChildren;
-    const isVisible = !searchTerm || hasMatches;
+    const isVisible = (!searchTerm && !hideDoneStories) || hasMatches;
 
     // Auto-expand if searching and has matches
     React.useEffect(() => {
@@ -181,7 +187,7 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
                     </div>
                 </button>
                 <Folder size={14} style={{ marginRight: '0.5rem', color: 'var(--color-accent)' }} />
-                <span style={{ fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folder.name}</span>
+                <span className="folder-title" style={{ fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{folder.name}</span>
 
                 <button
                     onClick={(e) => handleMenuOpen(e, folderId, 'folder')}
@@ -208,6 +214,7 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
                         items={[
                             { label: 'New Folder', icon: <Folder size={14} />, onClick: () => handleMenuAction('new-folder') },
                             { label: 'New Story', icon: <FileText size={14} />, onClick: () => handleMenuAction('new-story') },
+                            { label: 'Create Story with AI', icon: <Sparkles size={14} />, onClick: () => onCreateStoryAI(folderId) },
                             { label: 'Rename Folder', icon: <Edit2 size={14} />, onClick: () => handleMenuAction('rename') },
                             { label: 'Delete Folder', icon: <Trash2 size={14} />, onClick: () => handleMenuAction('delete'), danger: true },
                         ]}
@@ -251,6 +258,8 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
                             onSelectStory={onSelectStory}
                             selectedStoryId={selectedStoryId}
                             searchTerm={searchTerm}
+                            onCreateStoryAI={onCreateStoryAI}
+                            hideDoneStories={hideDoneStories}
                         />
                     ))}
 
@@ -269,7 +278,7 @@ const FolderItem = ({ folderId, depth = 0, onSelectStory, selectedStoryId, searc
     );
 };
 
-const FolderTree = ({ rootFolderId, onSelectStory, selectedStoryId, searchTerm }) => {
+const FolderTree = ({ rootFolderId, onSelectStory, selectedStoryId, searchTerm, onCreateStoryAI, hideDoneStories }) => {
     const { folders, stories } = useStore();
     const rootFolder = folders[rootFolderId];
 
@@ -279,6 +288,7 @@ const FolderTree = ({ rootFolderId, onSelectStory, selectedStoryId, searchTerm }
     const filteredStories = rootFolder.stories.filter(storyId => {
         const story = stories[storyId];
         if (!story || story.deleted) return false;
+        if (hideDoneStories && story.isDone) return false;
         if (!searchTerm) return true;
         return story.title.toLowerCase().includes(searchTerm.toLowerCase());
     });
@@ -293,6 +303,8 @@ const FolderTree = ({ rootFolderId, onSelectStory, selectedStoryId, searchTerm }
                     onSelectStory={onSelectStory}
                     selectedStoryId={selectedStoryId}
                     searchTerm={searchTerm}
+                    onCreateStoryAI={onCreateStoryAI}
+                    hideDoneStories={hideDoneStories}
                 />
             ))}
 

@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { useStore } from '../store';
-import { Settings, Plus, Folder, Trash2, ChevronDown, ChevronRight, MoreVertical, FileText, Edit2, Bug } from 'lucide-react';
+import { Settings, Plus, Folder, Trash2, ChevronDown, ChevronRight, MoreVertical, FileText, Edit2, Bug, Sparkles, Eye, EyeOff } from 'lucide-react';
 import FolderTree from './FolderTree';
 import Menu from './Menu';
 import ThemeToggle from './ThemeToggle';
 import AIDebugModal from './AIDebugModal';
+import CreateStoryAIModal from './CreateStoryAIModal';
 
 const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
-    const { projects, currentProjectId, addProject, deleteProject, addFolder, addStory, moveStory, moveFolder, updateProject, settings } = useStore();
+    const { projects, currentProjectId, addProject, deleteProject, addFolder, addStory, moveStory, moveFolder, updateProject, settings, openCreateStoryAIModal, updateSettings } = useStore();
     const [isCreating, setIsCreating] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
     const [expandedProjectIds, setExpandedProjectIds] = useState(new Set());
@@ -137,6 +138,12 @@ const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
                 break;
             }
         }
+    }
+
+
+    const handleCreateStoryAI = (folderId) => {
+        openCreateStoryAIModal(folderId);
+        setActiveMenu(null);
     };
 
     return (
@@ -166,7 +173,6 @@ const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
                     height: '100%',
                     cursor: 'col-resize',
                     backgroundColor: isResizing ? 'var(--color-primary)' : 'transparent',
-                    zIndex: 10,
                     zIndex: 10,
                 }}
                 onMouseDown={startResizing}
@@ -203,14 +209,14 @@ const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
                     </form>
                 )}
 
-                <div style={{ marginBottom: '1rem' }}>
+                <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem' }}>
                     <input
                         type="text"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         placeholder="Search stories..."
                         style={{
-                            width: '100%',
+                            flex: 1,
                             padding: '0.25rem 0.5rem',
                             fontSize: '0.9rem',
                             backgroundColor: 'var(--color-bg-primary)',
@@ -219,6 +225,23 @@ const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
                             color: 'var(--color-text-primary)'
                         }}
                     />
+                    <button
+                        onClick={() => updateSettings({ hideDoneStories: !settings.hideDoneStories })}
+                        title={settings.hideDoneStories ? "Show done stories" : "Hide done stories"}
+                        style={{
+                            padding: '0.25rem 0.5rem',
+                            backgroundColor: settings.hideDoneStories ? 'var(--color-bg-tertiary)' : 'transparent',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: '4px',
+                            color: 'var(--color-text-secondary)',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}
+                    >
+                        {settings.hideDoneStories ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
                 </div>
 
                 <ul style={{ listStyle: 'none', padding: 0 }}>
@@ -227,6 +250,7 @@ const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
                         return (
                             <li key={project.id} style={{ marginBottom: '0.5rem' }}>
                                 <div
+                                    className="project-row"
                                     style={{
                                         display: 'flex',
                                         alignItems: 'center',
@@ -267,7 +291,7 @@ const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
                                             )}
                                         </button>
                                         <Folder size={16} />
-                                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 500 }}>{project.name}</span>
+                                        <span className="project-title" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', fontWeight: 500 }}>{project.name}</span>
                                     </div>
                                     <button
                                         onClick={(e) => handleMenuOpen(e, project.id, 'project')}
@@ -278,7 +302,6 @@ const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
                                             border: 'none',
                                             cursor: 'pointer',
                                             display: 'flex',
-                                            alignItems: 'center'
                                         }}
                                     >
                                         <MoreVertical size={14} />
@@ -292,6 +315,7 @@ const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
                                             items={[
                                                 { label: 'New Folder', icon: <Folder size={14} />, onClick: () => handleMenuAction('new-folder', project) },
                                                 { label: 'New Story', icon: <FileText size={14} />, onClick: () => handleMenuAction('new-story', project) },
+                                                { label: 'Create Story with AI', icon: <Sparkles size={14} />, onClick: () => handleCreateStoryAI(project.rootFolderId) },
                                                 { label: 'Rename Project', icon: <Edit2 size={14} />, onClick: () => handleMenuAction('rename', project) },
                                                 { label: 'Delete Project', icon: <Trash2 size={14} />, onClick: () => handleMenuAction('delete', project), danger: true },
                                             ]}
@@ -306,6 +330,8 @@ const Sidebar = ({ onSelectStory, selectedStoryId, onSelectProject }) => {
                                             onSelectStory={onSelectStory}
                                             selectedStoryId={selectedStoryId}
                                             searchTerm={searchTerm}
+                                            onCreateStoryAI={handleCreateStoryAI}
+                                            hideDoneStories={settings.hideDoneStories}
                                         />
                                     </div>
                                 )}

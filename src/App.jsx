@@ -6,8 +6,10 @@ import ProjectView from './components/ProjectView';
 import StoryView from './components/StoryView';
 import { useStore } from './store';
 
+import CreateStoryAIModal from './components/CreateStoryAIModal';
+
 function App() {
-  const { currentProjectId, setCurrentProject, stories, folders, projects } = useStore();
+  const { currentProjectId, setCurrentProject, stories, folders, projects, createStoryAIModal, closeCreateStoryAIModal, addStory } = useStore();
   const [selectedStoryId, setSelectedStoryId] = useState(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -46,6 +48,17 @@ function App() {
     }
   };
 
+  const handleCreateStoryAISuccess = (content) => {
+    const { targetFolderId } = createStoryAIModal;
+    if (targetFolderId && content) {
+      const newStoryId = addStory(targetFolderId, content.title, content.description, content.acceptanceCriteria);
+      if (newStoryId) {
+        handleStorySelect(newStoryId);
+      }
+    }
+    closeCreateStoryAIModal();
+  };
+
   const renderContent = () => {
     if (selectedStoryId) {
       return <StoryView storyId={selectedStoryId} onBack={() => setSelectedStoryId(null)} setHasUnsavedChanges={setHasUnsavedChanges} />;
@@ -79,6 +92,12 @@ function App() {
           {renderContent()}
         </main>
       </div>
+      <CreateStoryAIModal
+        isOpen={createStoryAIModal.isOpen}
+        onClose={closeCreateStoryAIModal}
+        targetFolderId={createStoryAIModal.targetFolderId}
+        onSuccess={handleCreateStoryAISuccess}
+      />
     </Layout>
   );
 }

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store';
-import { Sparkles, GitBranch, Scissors, Edit, MessageSquare } from 'lucide-react';
+import { Sparkles, GitBranch, Scissors, Edit, MessageSquare, CheckSquare, Square } from 'lucide-react';
 import { improveStory, generateClarifyingQuestions, splitStory, generateSubfolderName } from '../services/ai';
 import ContentContainer from './ContentContainer';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -11,11 +11,12 @@ import RewriteTab from './StoryViewTabs/RewriteTab';
 import SplitTab from './StoryViewTabs/SplitTab';
 import VersionsTab from './StoryViewTabs/VersionsTab';
 import ChatTab from './ChatTab';
+import { useToast } from '../contexts/ToastContext';
 
 const StoryView = ({ storyId, setHasUnsavedChanges }) => {
-    const { stories, saveStory, restoreVersion, settings, updateVersion, projects, addStory, deleteStory, unsavedStories, setStoryUnsaved, drafts, saveDraft, discardDraft, triggerVersionTitleGeneration, addFolder } = useStore();
+    const { stories, saveStory, restoreVersion, settings, updateVersion, projects, addStory, deleteStory, unsavedStories, setStoryUnsaved, drafts, saveDraft, discardDraft, triggerVersionTitleGeneration, addFolder, toggleStoryDone } = useStore();
+    const { showToast } = useToast();
     const story = stories[storyId];
-    // const project = projects.find(p => p.id === story?.parentId) || projects.find(p => p.rootFolderId === story?.parentId);
 
     // Better approach: Use the folders slice to find the project ID from the story's parent folder.
     const { folders } = useStore();
@@ -55,6 +56,17 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
     const [splitAnswers, setSplitAnswers] = useState({});
     const [createSubfolder, setCreateSubfolder] = useState(false);
     const [subfolderName, setSubfolderName] = useState('');
+
+    const abortControllerRef = useRef(null);
+
+    const cancelAI = () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+        }
+        setIsImproving(false);
+        setIsSplitting(false);
+    };
 
     useEffect(() => {
         if (story) {
@@ -170,8 +182,11 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
     };
 
     const handleImprove = async () => {
-        if (!settings.openRouterKey) {
-            setError('Please add your OpenRouter API Key in Settings first.');
+        const { aiProvider, openRouterKey, anthropicKey } = settings;
+        const hasKey = aiProvider === 'anthropic' ? !!anthropicKey : !!openRouterKey;
+
+        if (!hasKey) {
+            setError(`Please add your ${aiProvider === 'anthropic' ? 'Anthropic' : 'OpenRouter'} API Key in Settings first.`);
             return;
         }
 
@@ -185,6 +200,12 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
             return;
         }
 
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         setIsImproving(true);
         setError(null);
         setClarifyingQuestions(null);
@@ -197,7 +218,7 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
                 const questions = await generateClarifyingQuestions(formData, settings, {
                     context: projectContext?.context,
                     systemPrompt: projectContext?.systemPrompt
-                });
+                }, 'improve', controller.signal);
 
                 if (questions && questions.length > 0) {
                     setClarifyingQuestions(questions);
@@ -206,24 +227,37 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
                     const improved = await improveStory(formData, settings, {
                         context: projectContext?.context,
                         systemPrompt: projectContext?.systemPrompt
-                    }, null, rewriteSelection);
+                    }, null, rewriteSelection, controller.signal);
                     setAiSuggestion(improved);
                 }
             } else {
                 const improved = await improveStory(formData, settings, {
                     context: projectContext?.context,
                     systemPrompt: projectContext?.systemPrompt
-                }, null, rewriteSelection);
+                }, null, rewriteSelection, controller.signal);
                 setAiSuggestion(improved);
             }
         } catch (err) {
-            setError('Failed to improve story: ' + err.message);
+            if (err.name === 'AbortError') {
+                console.log('AI generation cancelled');
+            } else {
+                setError('Failed to improve story: ' + err.message);
+            }
         } finally {
-            setIsImproving(false);
+            if (abortControllerRef.current === controller) {
+                setIsImproving(false);
+                abortControllerRef.current = null;
+            }
         }
     };
 
     const handleSubmitAnswers = async () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         setIsImproving(true);
         setError(null);
         try {
@@ -252,13 +286,20 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
             const improved = await improveStory(formData, settings, {
                 context: projectContext?.context,
                 systemPrompt: projectContext?.systemPrompt
-            }, qaContext, rewriteSelection);
+            }, qaContext, rewriteSelection, controller.signal);
             setAiSuggestion(improved);
             setClarifyingQuestions(null); // Clear questions after success
         } catch (err) {
-            setError('Failed to improve story: ' + err.message);
+            if (err.name === 'AbortError') {
+                console.log('AI generation cancelled');
+            } else {
+                setError('Failed to improve story: ' + err.message);
+            }
         } finally {
-            setIsImproving(false);
+            if (abortControllerRef.current === controller) {
+                setIsImproving(false);
+                abortControllerRef.current = null;
+            }
         }
     };
 
@@ -339,6 +380,12 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
     };
 
     const handleSubmitSplitAnswers = async () => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
+
         setIsSplitting(true);
         setError(null);
         try {
@@ -368,8 +415,8 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
                 splitStory(formData, settings, {
                     context: projectContext?.context,
                     systemPrompt: projectContext?.systemPrompt
-                }, splitInstructions, qaContext),
-                generateSubfolderName(formData, settings)
+                }, splitInstructions, qaContext, controller.signal),
+                generateSubfolderName(formData, settings, controller.signal)
             ]);
 
             if (result && result.length > 0) {
@@ -384,21 +431,37 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
                 throw new Error("AI returned no stories. Please try again.");
             }
         } catch (err) {
-            setError('Failed to split story: ' + err.message);
+            if (err.name === 'AbortError') {
+                console.log('AI generation cancelled');
+            } else {
+                setError('Failed to split story: ' + err.message);
+            }
         } finally {
-            setIsSplitting(false);
+            if (abortControllerRef.current === controller) {
+                setIsSplitting(false);
+                abortControllerRef.current = null;
+            }
         }
     };
 
     const handleSplit = async () => {
-        if (!settings.openRouterKey) {
-            setError('Please add your OpenRouter API Key in Settings first.');
+        const { aiProvider, openRouterKey, anthropicKey } = settings;
+        const hasKey = aiProvider === 'anthropic' ? !!anthropicKey : !!openRouterKey;
+
+        if (!hasKey) {
+            setError(`Please add your ${aiProvider === 'anthropic' ? 'Anthropic' : 'OpenRouter'} API Key in Settings first.`);
             return;
         }
 
         if (unsavedStories[storyId]) {
             handleSave();
         }
+
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
 
         setIsSplitting(true);
         setError(null);
@@ -413,7 +476,7 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
                 const questions = await generateClarifyingQuestions(formData, settings, {
                     context: projectContext?.context,
                     systemPrompt: projectContext?.systemPrompt
-                }, 'split');
+                }, 'split', controller.signal);
 
                 if (questions && questions.length > 0) {
                     setSplitClarifyingQuestions(questions);
@@ -423,8 +486,8 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
                         splitStory(formData, settings, {
                             context: projectContext?.context,
                             systemPrompt: projectContext?.systemPrompt
-                        }, splitInstructions),
-                        generateSubfolderName(formData, settings)
+                        }, splitInstructions, null, controller.signal),
+                        generateSubfolderName(formData, settings, controller.signal)
                     ]);
 
                     if (result && result.length > 0) {
@@ -442,8 +505,8 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
                     splitStory(formData, settings, {
                         context: projectContext?.context,
                         systemPrompt: projectContext?.systemPrompt
-                    }, splitInstructions),
-                    generateSubfolderName(formData, settings)
+                    }, splitInstructions, null, controller.signal),
+                    generateSubfolderName(formData, settings, controller.signal)
                 ]);
 
                 if (result && result.length > 0) {
@@ -457,17 +520,33 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
                 }
             }
         } catch (err) {
-            setError('Failed to split story: ' + err.message);
+            if (err.name === 'AbortError') {
+                console.log('AI generation cancelled');
+            } else {
+                setError('Failed to split story: ' + err.message);
+            }
         } finally {
-            setIsSplitting(false);
+            if (abortControllerRef.current === controller) {
+                setIsSplitting(false);
+                abortControllerRef.current = null;
+            }
         }
     };
 
     const handleReSplit = async () => {
-        if (!settings.openRouterKey) {
-            setError('Please add your OpenRouter API Key in Settings first.');
+        const { aiProvider, openRouterKey, anthropicKey } = settings;
+        const hasKey = aiProvider === 'anthropic' ? !!anthropicKey : !!openRouterKey;
+
+        if (!hasKey) {
+            setError(`Please add your ${aiProvider === 'anthropic' ? 'Anthropic' : 'OpenRouter'} API Key in Settings first.`);
             return;
         }
+
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
 
         setIsSplitting(true);
         setError(null);
@@ -476,7 +555,7 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
             const result = await splitStory(formData, settings, {
                 context: projectContext?.context,
                 systemPrompt: projectContext?.systemPrompt
-            }, splitInstructions);
+            }, splitInstructions, null, controller.signal);
 
             if (result && result.length > 0) {
                 setSplitStories(result);
@@ -485,9 +564,16 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
                 throw new Error("AI returned no stories. Please try again.");
             }
         } catch (err) {
-            setError('Failed to split story: ' + err.message);
+            if (err.name === 'AbortError') {
+                console.log('AI generation cancelled');
+            } else {
+                setError('Failed to split story: ' + err.message);
+            }
         } finally {
-            setIsSplitting(false);
+            if (abortControllerRef.current === controller) {
+                setIsSplitting(false);
+                abortControllerRef.current = null;
+            }
         }
     };
 
@@ -523,12 +609,28 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
         setActiveTab('edit');
     };
 
+    const handleToggleDone = () => {
+        toggleStoryDone(storyId);
+        const newIsDone = !story.isDone;
+
+        if (newIsDone && settings.hideDoneStories) {
+            showToast("Story marked done and hidden from sidebar", "info");
+        }
+    };
+
     const selectedVersion = story.versions && selectedVersionId ? story.versions[selectedVersionId] : null;
 
     return (
         <ContentContainer maxWidth="1000px">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', marginTop: '1rem' }}>
-                <h2 style={{ fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <h2 style={{ fontSize: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: story.isDone ? 'line-through' : 'none', color: story.isDone ? 'var(--color-text-tertiary)' : 'inherit' }}>
+                    <button
+                        onClick={handleToggleDone}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', color: story.isDone ? 'var(--color-success)' : 'var(--color-text-secondary)', display: 'flex', alignItems: 'center', padding: 0 }}
+                        title={story.isDone ? "Mark as not done" : "Mark as done"}
+                    >
+                        {story.isDone ? <CheckSquare size={24} /> : <Square size={24} />}
+                    </button>
                     {story.title}
                     {unsavedStories[storyId] && (
                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--color-warning)', flexShrink: 0 }} title="Unsaved Changes"></div>
@@ -588,6 +690,7 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
                         setClarifyingQuestions={setClarifyingQuestions}
                         ignoredQuestions={ignoredQuestions}
                         handleIgnoreQuestion={handleIgnoreQuestion}
+                        onCancel={cancelAI}
                     />
                 )}
 
@@ -621,6 +724,7 @@ const StoryView = ({ storyId, setHasUnsavedChanges }) => {
                         handleIgnoreQuestion={handleIgnoreQuestion}
                         retainOriginal={retainOriginal}
                         setRetainOriginal={setRetainOriginal}
+                        onCancel={cancelAI}
                     />
                 )}
 

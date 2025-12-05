@@ -513,6 +513,16 @@ const createContentSlice = (set, get) => ({
 
         return newState;
     }),
+    toggleStoryDone: (id) => set((state) => {
+        const story = state.stories[id];
+        if (!story) return state;
+        return {
+            stories: {
+                ...state.stories,
+                [id]: { ...story, isDone: !story.isDone }
+            }
+        };
+    }),
 });
 
 const createSettingsSlice = (set) => ({
@@ -521,6 +531,7 @@ const createSettingsSlice = (set) => ({
         anthropicKey: '',
         aiProvider: 'openrouter', // 'openrouter' or 'anthropic'
         aiDebug: false,
+        hideDoneStories: false,
         providerSettings: {
             openrouter: {
                 largeModel: 'openai/gpt-5-mini',
@@ -537,12 +548,26 @@ const createSettingsSlice = (set) => ({
     })),
 });
 
+const createUISlice = (set) => ({
+    createStoryAIModal: {
+        isOpen: false,
+        targetFolderId: null,
+    },
+    openCreateStoryAIModal: (targetFolderId) => set({
+        createStoryAIModal: { isOpen: true, targetFolderId }
+    }),
+    closeCreateStoryAIModal: () => set({
+        createStoryAIModal: { isOpen: false, targetFolderId: null }
+    }),
+});
+
 export const useStore = create(
     persist(
         (...a) => ({
             ...createProjectSlice(...a),
             ...createContentSlice(...a),
             ...createSettingsSlice(...a),
+            ...createUISlice(...a),
         }),
         {
             name: 'storyforge-storage',

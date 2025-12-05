@@ -22,7 +22,8 @@ const RewriteTab = ({
     rejectSuggestion,
     setClarifyingQuestions,
     ignoredQuestions,
-    handleIgnoreQuestion
+    handleIgnoreQuestion,
+    onCancel
 }) => {
     return (
         <motion.div
@@ -139,7 +140,33 @@ const RewriteTab = ({
                     </motion.button>
                 </div>
             ) : isImproving ? (
-                <LoadingAnimation />
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem' }}>
+                    <LoadingAnimation />
+                    <button
+                        onClick={onCancel}
+                        style={{
+                            marginTop: '1rem',
+                            padding: '0.5rem 1rem',
+                            backgroundColor: 'transparent',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: '4px',
+                            color: 'var(--color-text-secondary)',
+                            cursor: 'pointer',
+                            fontSize: '0.9rem',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseOver={(e) => {
+                            e.target.style.borderColor = 'var(--color-danger)';
+                            e.target.style.color = 'var(--color-danger)';
+                        }}
+                        onMouseOut={(e) => {
+                            e.target.style.borderColor = 'var(--color-border)';
+                            e.target.style.color = 'var(--color-text-secondary)';
+                        }}
+                    >
+                        Cancel Generation
+                    </button>
+                </div>
             ) : clarifyingQuestions ? (
                 <div className="questions-column" style={{ border: '1px solid var(--color-accent)', borderRadius: '8px', padding: '1.5rem', backgroundColor: 'var(--color-bg-secondary)' }}>
                     <h3 style={{ marginBottom: '1.5rem', color: 'var(--color-accent)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
